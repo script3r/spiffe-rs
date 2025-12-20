@@ -26,10 +26,10 @@ fn validate_address_cases() {
     let mut cases = vec![
         ValidateAddressCase {
             addr: "\t",
-            err: "valid URI",
+            err: "workload endpoint socket is not a valid URI",
         },
         ValidateAddressCase {
-            addr: "foo://bar",
+            addr: "blah",
             err: "workload endpoint socket URI must have a \"tcp\" or \"unix\" scheme",
         },
         ValidateAddressCase {

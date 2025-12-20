@@ -86,22 +86,47 @@ pub async fn dial_with_mode(
         crate::spiffetls::mode::ClientMode::Mtls => {
             let svid = m.svid.ok_or_else(|| crate::spiffetls::wrap_error("missing svid source"))?;
             let bundle = m.bundle.ok_or_else(|| crate::spiffetls::wrap_error("missing bundle source"))?;
-            tlsconfig::mtls_client_config(svid.as_ref(), bundle, m.authorizer.clone())?
+            tlsconfig::mtls_client_config_with_options(
+                svid.as_ref(),
+                bundle,
+                m.authorizer.clone(),
+                &config.tls_options,
+            )?
         }
         crate::spiffetls::mode::ClientMode::MtlsWeb => {
             let svid = m.svid.ok_or_else(|| crate::spiffetls::wrap_error("missing svid source"))?;
-            tlsconfig::mtls_web_client_config(svid.as_ref(), m.roots)?
+            tlsconfig::mtls_web_client_config_with_options(
+                svid.as_ref(),
+                m.roots,
+                &config.tls_options,
+            )?
         }
     };
 
-    let _ = config;
     let tcp = TcpStream::connect(addr).map_err(|err| crate::spiffetls::wrap_error(err))?;
+    let tls_config = apply_base_client_config(tls_config, config.base_client_config);
     let conn = rustls::ClientConnection::new(Arc::new(tls_config), server_name)
         .map_err(|err| crate::spiffetls::wrap_error(format!("unable to create client connection: {}", err)))?;
     Ok(ClientStream {
         inner: rustls::StreamOwned::new(conn, tcp),
         source,
     })
+}
+
+fn apply_base_client_config(
+    mut computed: rustls::ClientConfig,
+    base: Option<rustls::ClientConfig>,
+) -> rustls::ClientConfig {
+    let Some(base) = base else {
+        return computed;
+    };
+    computed.alpn_protocols = base.alpn_protocols;
+    computed.resumption = base.resumption;
+    computed.max_fragment_size = base.max_fragment_size;
+    computed.enable_sni = base.enable_sni;
+    computed.key_log = base.key_log;
+    computed.enable_early_data = base.enable_early_data;
+    computed
 }
 
 fn peer_id_from_certs(certs: Option<&[rustls::Certificate]>) -> Result<ID> {

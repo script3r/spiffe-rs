@@ -1,7 +1,7 @@
 use crate::bundle::x509bundle;
 use crate::svid::x509svid;
 use crate::workloadapi::option::{X509SourceConfig, X509SourceOption};
-use crate::workloadapi::{wrap_error, Context, Result, Watcher, X509Context};
+use crate::workloadapi::{Context, Result, Watcher, X509Context};
 use std::sync::{Arc, RwLock};
 
 pub struct X509Source {
@@ -62,7 +62,7 @@ impl X509Source {
             .read()
             .ok()
             .and_then(|guard| guard.clone())
-            .ok_or_else(|| wrap_error("missing X509-SVID"))
+            .ok_or_else(|| crate::workloadapi::Error::new("x509source: missing X509-SVID"))
     }
 
     pub fn get_x509_bundle_for_trust_domain(
@@ -74,7 +74,7 @@ impl X509Source {
             .read()
             .ok()
             .and_then(|guard| guard.as_ref().and_then(|b| b.get_x509_bundle_for_trust_domain(trust_domain).ok()))
-            .ok_or_else(|| wrap_error("no X.509 bundle found"))
+            .ok_or_else(|| crate::workloadapi::Error::new("x509source: no X.509 bundle found"))
     }
 
     pub async fn wait_until_updated(&self, ctx: &Context) -> Result<()> {
@@ -87,7 +87,7 @@ impl X509Source {
 
     fn check_closed(&self) -> Result<()> {
         if self.closed.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err(wrap_error("source is closed"));
+            return Err(crate::workloadapi::Error::new("x509source: source is closed"));
         }
         Ok(())
     }

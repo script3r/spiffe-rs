@@ -15,8 +15,25 @@ pub fn validate_address(addr: &str) -> Result<()> {
 }
 
 pub fn target_from_address(addr: &str) -> Result<String> {
-    let url = Url::parse(addr)
-        .map_err(|err| wrap_error(format!("workload endpoint socket is not a valid URI: {}", err)))?;
+    if addr.chars().any(|c| c.is_control()) {
+        return Err(wrap_error(
+            "workload endpoint socket is not a valid URI: invalid control character in URL",
+        ));
+    }
+    let url = match Url::parse(addr) {
+        Ok(url) => url,
+        Err(url::ParseError::RelativeUrlWithoutBase) => {
+            return Err(wrap_error(
+                "workload endpoint socket URI must have a \"tcp\" or \"unix\" scheme",
+            ));
+        }
+        Err(err) => {
+            return Err(wrap_error(format!(
+                "workload endpoint socket is not a valid URI: {}",
+                err
+            )));
+        }
+    };
     parse_target_from_url(&url)
 }
 

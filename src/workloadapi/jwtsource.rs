@@ -1,7 +1,7 @@
 use crate::bundle::jwtbundle;
 use crate::svid::jwtsvid;
 use crate::workloadapi::option::{JWTSourceConfig, JWTSourceOption};
-use crate::workloadapi::{wrap_error, Context, Result, Watcher};
+use crate::workloadapi::{Context, Result, Watcher};
 use std::sync::{Arc, RwLock};
 
 pub struct JWTSource {
@@ -74,7 +74,7 @@ impl JWTSource {
             .read()
             .ok()
             .and_then(|guard| guard.as_ref().and_then(|b| b.get_jwt_bundle_for_trust_domain(trust_domain).ok()))
-            .ok_or_else(|| wrap_error("no JWT bundle found"))
+            .ok_or_else(|| crate::workloadapi::Error::new("jwtsource: no JWT bundle found"))
     }
 
     pub async fn wait_until_updated(&self, ctx: &Context) -> Result<()> {
@@ -87,7 +87,7 @@ impl JWTSource {
 
     fn check_closed(&self) -> Result<()> {
         if self.closed.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err(wrap_error("source is closed"));
+            return Err(crate::workloadapi::Error::new("jwtsource: source is closed"));
         }
         Ok(())
     }

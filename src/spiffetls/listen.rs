@@ -96,12 +96,17 @@ pub async fn listen_with_mode(
     let tls_config = match m.mode {
         crate::spiffetls::mode::ServerMode::Tls => {
             let svid = m.svid.ok_or_else(|| crate::spiffetls::wrap_error("missing svid source"))?;
-            tlsconfig::tls_server_config(svid.as_ref())?
+            tlsconfig::tls_server_config_with_options(svid.as_ref(), &config.tls_options)?
         }
         crate::spiffetls::mode::ServerMode::Mtls => {
             let svid = m.svid.ok_or_else(|| crate::spiffetls::wrap_error("missing svid source"))?;
             let bundle = m.bundle.ok_or_else(|| crate::spiffetls::wrap_error("missing bundle source"))?;
-            tlsconfig::mtls_server_config(svid.as_ref(), bundle, m.authorizer.clone())?
+            tlsconfig::mtls_server_config_with_options(
+                svid.as_ref(),
+                bundle,
+                m.authorizer.clone(),
+                &config.tls_options,
+            )?
         }
         crate::spiffetls::mode::ServerMode::MtlsWeb => {
             let bundle = m.bundle.ok_or_else(|| crate::spiffetls::wrap_error("missing bundle source"))?;
@@ -110,11 +115,30 @@ pub async fn listen_with_mode(
         }
     };
 
-    let _ = config;
     let listener = TcpListener::bind(addr).map_err(|err| crate::spiffetls::wrap_error(err))?;
+    let tls_config = apply_base_server_config(tls_config, config.base_server_config);
     Ok(Listener {
         inner: listener,
         config: Arc::new(tls_config),
         source,
     })
+}
+
+fn apply_base_server_config(
+    mut computed: rustls::ServerConfig,
+    base: Option<rustls::ServerConfig>,
+) -> rustls::ServerConfig {
+    let Some(base) = base else {
+        return computed;
+    };
+    computed.ignore_client_order = base.ignore_client_order;
+    computed.max_fragment_size = base.max_fragment_size;
+    computed.session_storage = base.session_storage;
+    computed.ticketer = base.ticketer;
+    computed.alpn_protocols = base.alpn_protocols;
+    computed.key_log = base.key_log;
+    computed.max_early_data_size = base.max_early_data_size;
+    computed.send_half_rtt_data = base.send_half_rtt_data;
+    computed.send_tls13_tickets = base.send_tls13_tickets;
+    computed
 }

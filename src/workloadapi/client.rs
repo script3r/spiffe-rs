@@ -7,7 +7,7 @@ use crate::workloadapi::proto::{
     JwtBundlesRequest, JwtBundlesResponse, JwtsvidRequest, JwtsvidResponse, ValidateJwtsvidRequest,
     X509BundlesRequest, X509BundlesResponse, X509svidRequest, X509svidResponse,
 };
-use crate::workloadapi::{target_from_address, wrap_error, Backoff, Error, Result, SocketEnv};
+use crate::workloadapi::{target_from_address, wrap_error, Backoff, Error, Result};
 use crate::workloadapi::{option::ClientConfig, Context};
 use tower::service_fn;
 use std::collections::HashSet;
@@ -35,10 +35,7 @@ impl Client {
         let address = match config.address.clone() {
             Some(addr) => addr,
             None => crate::workloadapi::get_default_address().ok_or_else(|| {
-                wrap_error(format!(
-                    "workload endpoint socket address is not configured (missing {})",
-                    SocketEnv
-                ))
+                wrap_error("workload endpoint socket address is not configured")
             })?,
         };
         let target = target_from_address(&address)?;

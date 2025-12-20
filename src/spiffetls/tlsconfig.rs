@@ -11,16 +11,30 @@ pub type Authorizer =
     Arc<dyn Fn(&ID, &[Vec<Vec<u8>>]) -> std::result::Result<(), super::Error> + Send + Sync>;
 
 #[derive(Clone, Default)]
-pub struct Trace;
+pub struct Trace {
+    pub get_certificate: Option<Arc<dyn Fn(GetCertificateInfo) + Send + Sync>>,
+    pub got_certificate: Option<Arc<dyn Fn(GotCertificateInfo) + Send + Sync>>,
+}
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
+pub struct GetCertificateInfo;
+
+#[derive(Clone, Default)]
+pub struct GotCertificateInfo {
+    pub cert: Option<Certificate>,
+    pub err: Option<String>,
+}
+
+#[derive(Clone, Default)]
 pub struct TlsOption {
-    _trace: std::option::Option<Trace>,
+    trace: std::option::Option<Trace>,
 }
 
 impl TlsOption {
     pub fn with_trace(trace: Trace) -> Self {
-        Self { _trace: std::option::Option::Some(trace) }
+        Self {
+            trace: std::option::Option::Some(trace),
+        }
     }
 }
 
@@ -68,7 +82,16 @@ pub fn mtls_client_config(
     bundle_source: Arc<dyn x509bundle::Source + Send + Sync>,
     authorizer: Authorizer,
 ) -> super::Result<ClientConfig> {
-    let (certs, key) = svid_to_rustls(svid_source)?;
+    mtls_client_config_with_options(svid_source, bundle_source, authorizer, &[])
+}
+
+pub fn mtls_client_config_with_options(
+    svid_source: &dyn x509svid::Source,
+    bundle_source: Arc<dyn x509bundle::Source + Send + Sync>,
+    authorizer: Authorizer,
+    opts: &[TlsOption],
+) -> super::Result<ClientConfig> {
+    let (certs, key) = svid_to_rustls(svid_source, trace_from_options(opts))?;
     let verifier = Arc::new(SpiffeServerVerifier::new(bundle_source, authorizer));
     ClientConfig::builder()
         .with_safe_defaults()
@@ -82,7 +105,16 @@ pub fn mtls_server_config(
     bundle_source: Arc<dyn x509bundle::Source + Send + Sync>,
     authorizer: Authorizer,
 ) -> super::Result<ServerConfig> {
-    let (certs, key) = svid_to_rustls(svid_source)?;
+    mtls_server_config_with_options(svid_source, bundle_source, authorizer, &[])
+}
+
+pub fn mtls_server_config_with_options(
+    svid_source: &dyn x509svid::Source,
+    bundle_source: Arc<dyn x509bundle::Source + Send + Sync>,
+    authorizer: Authorizer,
+    opts: &[TlsOption],
+) -> super::Result<ServerConfig> {
+    let (certs, key) = svid_to_rustls(svid_source, trace_from_options(opts))?;
     let verifier = Arc::new(SpiffeClientVerifier::new(bundle_source, authorizer));
     ServerConfig::builder()
         .with_safe_defaults()
@@ -92,7 +124,14 @@ pub fn mtls_server_config(
 }
 
 pub fn tls_server_config(svid_source: &dyn x509svid::Source) -> super::Result<ServerConfig> {
-    let (certs, key) = svid_to_rustls(svid_source)?;
+    tls_server_config_with_options(svid_source, &[])
+}
+
+pub fn tls_server_config_with_options(
+    svid_source: &dyn x509svid::Source,
+    opts: &[TlsOption],
+) -> super::Result<ServerConfig> {
+    let (certs, key) = svid_to_rustls(svid_source, trace_from_options(opts))?;
     ServerConfig::builder()
         .with_safe_defaults()
         .with_no_client_auth()
@@ -104,7 +143,15 @@ pub fn mtls_web_client_config(
     svid_source: &dyn x509svid::Source,
     roots: std::option::Option<RootCertStore>,
 ) -> super::Result<ClientConfig> {
-    let (certs, key) = svid_to_rustls(svid_source)?;
+    mtls_web_client_config_with_options(svid_source, roots, &[])
+}
+
+pub fn mtls_web_client_config_with_options(
+    svid_source: &dyn x509svid::Source,
+    roots: std::option::Option<RootCertStore>,
+    opts: &[TlsOption],
+) -> super::Result<ClientConfig> {
+    let (certs, key) = svid_to_rustls(svid_source, trace_from_options(opts))?;
     let mut config = ClientConfig::builder()
         .with_safe_defaults()
         .with_root_certificates(roots.unwrap_or_else(system_roots))
@@ -136,10 +183,29 @@ pub fn webpki_client_config(roots: std::option::Option<RootCertStore>) -> super:
     Ok(config)
 }
 
-fn svid_to_rustls(svid_source: &dyn x509svid::Source) -> super::Result<(Vec<Certificate>, PrivateKey)> {
-    let svid = svid_source
-        .get_x509_svid()
-        .map_err(|err| super::wrap_error(err))?;
+fn svid_to_rustls(
+    svid_source: &dyn x509svid::Source,
+    trace: std::option::Option<&Trace>,
+) -> super::Result<(Vec<Certificate>, PrivateKey)> {
+    if let Some(trace) = trace {
+        if let Some(get) = &trace.get_certificate {
+            get(GetCertificateInfo);
+        }
+    }
+    let svid = match svid_source.get_x509_svid() {
+        Ok(svid) => svid,
+        Err(err) => {
+            if let Some(trace) = trace {
+                if let Some(got) = &trace.got_certificate {
+                    got(GotCertificateInfo {
+                        cert: None,
+                        err: Some(err.to_string()),
+                    });
+                }
+            }
+            return Err(super::wrap_error(err));
+        }
+    };
     if svid.certificates.is_empty() {
         return Err(super::wrap_error("empty X509-SVID"));
     }
@@ -148,7 +214,20 @@ fn svid_to_rustls(svid_source: &dyn x509svid::Source) -> super::Result<(Vec<Cert
         .iter()
         .map(|cert| Certificate(cert.clone()))
         .collect::<Vec<_>>();
-    Ok((certs, PrivateKey(svid.private_key.clone())))
+    let key = PrivateKey(svid.private_key.clone());
+    if let Some(trace) = trace {
+        if let Some(got) = &trace.got_certificate {
+            got(GotCertificateInfo {
+                cert: certs.first().cloned(),
+                err: None,
+            });
+        }
+    }
+    Ok((certs, key))
+}
+
+fn trace_from_options(opts: &[TlsOption]) -> std::option::Option<&Trace> {
+    opts.iter().rev().find_map(|opt| opt.trace.as_ref())
 }
 
 fn system_roots() -> RootCertStore {

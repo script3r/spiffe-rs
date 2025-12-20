@@ -47,6 +47,13 @@ impl Error {
     pub fn status(&self) -> Option<&tonic::Status> {
         self.status.as_ref()
     }
+
+    pub(crate) fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            status: None,
+        }
+    }
 }
 
 impl From<tonic::Status> for Error {

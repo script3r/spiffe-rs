@@ -1,7 +1,7 @@
 use crate::bundle::{jwtbundle, spiffebundle, x509bundle};
 use crate::spiffeid::TrustDomain;
 use crate::workloadapi::option::{BundleSourceConfig, BundleSourceOption};
-use crate::workloadapi::{wrap_error, Context, Result, Watcher, X509Context};
+use crate::workloadapi::{Context, Result, Watcher, X509Context};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 
@@ -75,8 +75,8 @@ impl BundleSource {
             .and_then(|guard| guard.get(&trust_domain).cloned());
 
         if x509.is_none() && jwt.is_none() {
-            return Err(wrap_error(format!(
-                "no SPIFFE bundle for trust domain {:?}",
+            return Err(crate::workloadapi::Error::new(format!(
+                "bundlesource: no SPIFFE bundle for trust domain {:?}",
                 trust_domain
             )));
         }
@@ -97,7 +97,12 @@ impl BundleSource {
             .read()
             .ok()
             .and_then(|guard| guard.get(&trust_domain).cloned())
-            .ok_or_else(|| wrap_error(format!("no X.509 bundle for trust domain {:?}", trust_domain)))?;
+            .ok_or_else(|| {
+                crate::workloadapi::Error::new(format!(
+                    "bundlesource: no X.509 bundle for trust domain {:?}",
+                    trust_domain
+                ))
+            })?;
         Ok(x509bundle::Bundle::from_x509_authorities(trust_domain, &x509))
     }
 
@@ -108,7 +113,12 @@ impl BundleSource {
             .read()
             .ok()
             .and_then(|guard| guard.get(&trust_domain).cloned())
-            .ok_or_else(|| wrap_error(format!("no JWT bundle for trust domain {:?}", trust_domain)))?;
+            .ok_or_else(|| {
+                crate::workloadapi::Error::new(format!(
+                    "bundlesource: no JWT bundle for trust domain {:?}",
+                    trust_domain
+                ))
+            })?;
         Ok(jwtbundle::Bundle::from_jwt_authorities(trust_domain, &jwt))
     }
 
@@ -122,7 +132,7 @@ impl BundleSource {
 
     fn check_closed(&self) -> Result<()> {
         if self.closed.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err(wrap_error("source is closed"));
+            return Err(crate::workloadapi::Error::new("bundlesource: source is closed"));
         }
         Ok(())
     }
