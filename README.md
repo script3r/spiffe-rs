@@ -1,5 +1,7 @@
 # spiffe-rs
 
+[![Crates.io](https://img.shields.io/crates/v/spiffe-rs.svg)](https://crates.io/crates/spiffe-rs)
+
 `spiffe-rs` is a Rust port of the `spiffe-go` library, and all credit for the
 design, API surface, and semantics belongs to the original `spiffe-go`
 maintainers and contributors. This repository is an automated port: the current
