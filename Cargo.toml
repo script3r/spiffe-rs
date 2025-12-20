@@ -25,13 +25,62 @@ sha2 = { version = "0.10", features = ["oid"] }
 prost = "0.12"
 prost-types = "0.12"
 rustls = { version = "0.21", features = ["dangerous_configuration"] }
-tokio = { version = "1", features = ["macros", "net", "rt-multi-thread"] }
+tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "signal"] }
 tokio-stream = "0.1"
 tonic = { version = "0.11", features = ["transport"] }
 rustls-native-certs = "0.7"
 tokio-util = "0.7"
 tower = "0.4"
-hyper = { version = "0.14", features = ["server", "http1"] }
+hyper = { version = "0.14", features = ["client", "server", "http1"] }
+tokio-rustls = "0.24"
+
+[[example]]
+name = "spiffe-tls-client"
+path = "examples/spiffe-tls/client.rs"
+
+[[example]]
+name = "spiffe-tls-server"
+path = "examples/spiffe-tls/server.rs"
+
+[[example]]
+name = "spiffe-watcher"
+path = "examples/spiffe-watcher/main.rs"
+
+[[example]]
+name = "spiffe-grpc-client"
+path = "examples/spiffe-grpc/client.rs"
+
+[[example]]
+name = "spiffe-grpc-server"
+path = "examples/spiffe-grpc/server.rs"
+
+[[example]]
+name = "spiffe-http-client"
+path = "examples/spiffe-http/client.rs"
+
+[[example]]
+name = "spiffe-http-server"
+path = "examples/spiffe-http/server.rs"
+
+[[example]]
+name = "spiffe-jwt-client"
+path = "examples/spiffe-jwt/client.rs"
+
+[[example]]
+name = "spiffe-jwt-server"
+path = "examples/spiffe-jwt/server.rs"
+
+[[example]]
+name = "spiffe-jwt-using-proxy-client"
+path = "examples/spiffe-jwt-using-proxy/client.rs"
+
+[[example]]
+name = "spiffe-jwt-using-proxy-proxy"
+path = "examples/spiffe-jwt-using-proxy/proxy.rs"
+
+[[example]]
+name = "spiffe-jwt-using-proxy-server"
+path = "examples/spiffe-jwt-using-proxy/server.rs"
 
 [dev-dependencies]
 rand = "0.8"

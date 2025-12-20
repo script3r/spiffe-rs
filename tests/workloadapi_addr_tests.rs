@@ -92,6 +92,14 @@ fn validate_address_cases() {
             addr: "unix://foo",
             err: "",
         },
+        ValidateAddressCase {
+            addr: "unix:/tmp/agent.sock",
+            err: "",
+        },
+        ValidateAddressCase {
+            addr: "unix:///tmp/agent.sock",
+            err: "",
+        },
     ];
 
     for case in cases.drain(..) {

@@ -20,6 +20,8 @@ and SVIDs, plus Workload API and SPIFFE TLS helpers.
 
 ## Examples
 
+See `examples/README.md` for full standalone examples that mirror the go-spiffe examples.
+
 Parse and validate a SPIFFE ID:
 
 ```rust

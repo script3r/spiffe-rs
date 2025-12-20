@@ -6,5 +6,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .build_server(false)
         .compile_well_known_types(true)
         .compile(&["proto/spiffe/workload/workload.proto"], &["proto"])?;
+
+    tonic_build::configure()
+        .compile(&["proto/examples/helloworld.proto"], &["proto/examples"])?;
     Ok(())
 }

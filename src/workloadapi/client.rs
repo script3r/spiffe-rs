@@ -284,23 +284,21 @@ fn with_header<T>(mut request: Request<T>) -> Request<T> {
 }
 
 async fn connect_channel(target: &str, options: &[Arc<dyn crate::workloadapi::DialOption>]) -> Result<Channel> {
-    if target.starts_with("unix://") {
-        let url = url::Url::parse(target)
-            .map_err(|err| wrap_error(format!("workload endpoint socket is not a valid URI: {}", err)))?;
-        let path = url
-            .to_file_path()
-            .map_err(|_| wrap_error("workload endpoint unix socket URI must include a path"))?;
-        let mut endpoint = Endpoint::try_from("http://[::]:0")
-            .map_err(|err| wrap_error(format!("invalid endpoint: {}", err)))?;
-        for opt in options {
-            endpoint = opt.apply(endpoint);
+    if let Ok(url) = url::Url::parse(target) {
+        if url.scheme() == "unix" {
+            let path = unix_path_from_url(&url)?;
+            let mut endpoint = Endpoint::try_from("http://[::]:0")
+                .map_err(|err| wrap_error(format!("invalid endpoint: {}", err)))?;
+            for opt in options {
+                endpoint = opt.apply(endpoint);
+            }
+            let connector = service_fn(move |_uri| UnixStream::connect(path.clone()));
+            let channel = endpoint
+                .connect_with_connector(connector)
+                .await
+                .map_err(|err| wrap_error(format!("unable to connect: {}", err)))?;
+            return Ok(channel);
         }
-        let connector = service_fn(move |_uri| UnixStream::connect(path.clone()));
-        let channel = endpoint
-            .connect_with_connector(connector)
-            .await
-            .map_err(|err| wrap_error(format!("unable to connect: {}", err)))?;
-        return Ok(channel);
     }
 
     let mut endpoint = Endpoint::from_shared(format!("http://{}", target))
@@ -312,6 +310,24 @@ async fn connect_channel(target: &str, options: &[Arc<dyn crate::workloadapi::Di
         .connect()
         .await
         .map_err(|err| wrap_error(format!("unable to connect: {}", err)))
+}
+
+fn unix_path_from_url(url: &url::Url) -> Result<std::path::PathBuf> {
+    if url.cannot_be_a_base() {
+        return Err(wrap_error("workload endpoint unix socket URI must not be opaque"));
+    }
+    let host = url.host_str().unwrap_or("");
+    let raw_path = if host.is_empty() {
+        url.path().to_string()
+    } else if url.path().is_empty() {
+        format!("/{host}")
+    } else {
+        format!("/{host}{}", url.path())
+    };
+    if raw_path.is_empty() || raw_path == "/" {
+        return Err(wrap_error("workload endpoint unix socket URI must include a path"));
+    }
+    Ok(std::path::PathBuf::from(raw_path))
 }
 
 async fn cancelable<T, F>(ctx: &Context, fut: F) -> Result<T>
