@@ -70,10 +70,21 @@ The goal is feature parity with `spiffe-go`. If you find a mismatch or missing
 capability, please open an issue with the expected Go behavior and a minimal
 repro.
 
+Interoperability with Go is exercised via optional compatibility tests (enabled
+with `SPIFFE_RS_GO_COMPAT=1`). These include JSON bundle parity, Workload API
+interop against a Go server, and SPIFFE TLS interop where a Go-issued SVID is
+accepted by Rustls via the `spiffetls` helpers.
+
 ## Development
 
 Run tests:
 
 ```bash
 cargo test
+```
+
+Run Go compatibility tests:
+
+```bash
+SPIFFE_RS_GO_COMPAT=1 cargo test --test compat_spiffebundle_go --test compat_workloadapi_go --test compat_spiffetls_go
 ```
