@@ -31,10 +31,12 @@ fn wrap_error(message: impl std::fmt::Display) -> Error {
     Error(format!("federation: {}", message))
 }
 
+/// An option for fetching a SPIFFE bundle from a remote URL.
 pub trait FetchOption {
     fn apply(&self, options: &mut FetchOptions) -> Result<()>;
 }
 
+/// Sets the authentication method to SPIFFE-TLS.
 pub fn with_spiffe_auth(
     bundle_source: Arc<dyn x509bundle::Source + Send + Sync>,
     endpoint_id: spiffeid::ID,
@@ -53,6 +55,7 @@ pub fn with_spiffe_auth(
     })
 }
 
+/// Sets the authentication method to Web PKI with the given roots.
 pub fn with_web_pki_roots(roots: RootCertStore) -> impl FetchOption {
     FetchOptionFn(move |options: &mut FetchOptions| {
         if !matches!(options.auth_method, AuthMethod::Default) {
@@ -65,6 +68,7 @@ pub fn with_web_pki_roots(roots: RootCertStore) -> impl FetchOption {
     })
 }
 
+/// Fetches a SPIFFE bundle from the given URL.
 pub fn fetch_bundle(
     trust_domain: TrustDomain,
     url: &str,
@@ -80,12 +84,17 @@ pub fn fetch_bundle(
     spiffebundle::Bundle::parse(trust_domain, &body).map_err(|err| wrap_error(err))
 }
 
+/// A watcher for SPIFFE bundle updates.
 pub trait BundleWatcher: Send + Sync {
+    /// Returns the duration to wait before the next refresh.
     fn next_refresh(&self, refresh_hint: Duration) -> Duration;
+    /// Called when the bundle is updated.
     fn on_update(&self, bundle: spiffebundle::Bundle);
+    /// Called when an error occurs during fetching.
     fn on_error(&self, err: Error);
 }
 
+/// Watches a SPIFFE bundle at the given URL for updates.
 pub async fn watch_bundle(
     ctx: &Context,
     trust_domain: TrustDomain,
@@ -155,10 +164,12 @@ where
     }
 }
 
+/// An option for configuring a `BundleHandler`.
 pub trait HandlerOption {
     fn apply(&self, config: &mut HandlerConfig) -> Result<()>;
 }
 
+/// Sets the logger for the handler.
 pub fn with_handler_logger(log: crate::workloadapi::LoggerRef) -> Box<dyn HandlerOption> {
     Box::new(HandlerOptionFn(move |config: &mut HandlerConfig| {
         config.log = log.clone();
@@ -166,6 +177,7 @@ pub fn with_handler_logger(log: crate::workloadapi::LoggerRef) -> Box<dyn Handle
     }))
 }
 
+/// Creates a new `BundleHandler` that serves a SPIFFE bundle for the given trust domain.
 pub fn new_handler(
     trust_domain: TrustDomain,
     source: Arc<dyn spiffebundle::Source + Send + Sync>,
@@ -184,6 +196,7 @@ pub fn new_handler(
     })
 }
 
+/// A handler that serves a SPIFFE bundle over HTTP.
 pub struct BundleHandler {
     trust_domain: TrustDomain,
     source: Arc<dyn spiffebundle::Source + Send + Sync>,

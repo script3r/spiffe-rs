@@ -6,12 +6,16 @@ use url::Url;
 
 const SCHEME_PREFIX: &str = "spiffe://";
 
+/// A SPIFFE ID is a structured URI that uniquely identifies a workload or other entity.
+///
+/// It follows the format: `spiffe://<trust-domain>/<path>`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ID {
     id: String,
     path_idx: usize,
 }
 
+/// A parsed SPIFFE URL.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SpiffeUrl {
     scheme: String,
@@ -20,6 +24,7 @@ pub struct SpiffeUrl {
 }
 
 impl SpiffeUrl {
+    /// Creates a new `SpiffeUrl`.
     pub fn new(scheme: &str, host: &str, path: &str) -> Self {
         Self {
             scheme: scheme.to_string(),
@@ -28,6 +33,7 @@ impl SpiffeUrl {
         }
     }
 
+    /// Creates an empty `SpiffeUrl`.
     pub fn empty() -> Self {
         Self {
             scheme: String::new(),
@@ -36,22 +42,27 @@ impl SpiffeUrl {
         }
     }
 
+    /// Returns the scheme of the URL.
     pub fn scheme(&self) -> &str {
         &self.scheme
     }
 
+    /// Returns the host of the URL (the trust domain).
     pub fn host(&self) -> &str {
         &self.host
     }
 
+    /// Returns the path of the URL.
     pub fn path(&self) -> &str {
         &self.path
     }
 
+    /// Returns `true` if the URL is empty.
     pub fn is_empty(&self) -> bool {
         self.scheme.is_empty() && self.host.is_empty() && self.path.is_empty()
     }
 
+    /// Converts the `SpiffeUrl` to a `url::Url`.
     pub fn as_url(&self) -> Option<Url> {
         if self.is_empty() {
             return None;
@@ -70,21 +81,25 @@ impl std::fmt::Display for SpiffeUrl {
 }
 
 impl ID {
+    /// Creates a SPIFFE ID from a trust domain and a path.
     pub fn from_path(td: TrustDomain, path: &str) -> Result<ID> {
         validate_path(path)?;
         make_id(&td, path)
     }
 
+    /// Creates a SPIFFE ID from a trust domain and a formatted path.
     pub fn from_pathf(td: TrustDomain, args: std::fmt::Arguments<'_>) -> Result<ID> {
         let path = format_path(args)?;
         make_id(&td, &path)
     }
 
+    /// Creates a SPIFFE ID from a trust domain and path segments.
     pub fn from_segments(td: TrustDomain, segments: &[&str]) -> Result<ID> {
         let path = join_path_segments(segments)?;
         make_id(&td, &path)
     }
 
+    /// Parses a SPIFFE ID from a string.
     pub fn from_string(id: &str) -> Result<ID> {
         if id.is_empty() {
             return Err(Error::Empty);
@@ -118,14 +133,17 @@ impl ID {
         })
     }
 
+    /// Parses a SPIFFE ID from formatted arguments.
     pub fn from_stringf(args: std::fmt::Arguments<'_>) -> Result<ID> {
         ID::from_string(&format!("{}", args))
     }
 
+    /// Parses a SPIFFE ID from a `url::Url`.
     pub fn from_uri(uri: &Url) -> Result<ID> {
         ID::from_string(uri.as_str())
     }
 
+    /// Returns the trust domain of the SPIFFE ID.
     pub fn trust_domain(&self) -> TrustDomain {
         if self.is_zero() {
             return TrustDomain { name: String::new() };
@@ -135,14 +153,17 @@ impl ID {
         }
     }
 
+    /// Returns `true` if the SPIFFE ID is a member of the given trust domain.
     pub fn member_of(&self, td: &TrustDomain) -> bool {
         self.trust_domain() == *td
     }
 
+    /// Returns the path component of the SPIFFE ID.
     pub fn path(&self) -> &str {
         &self.id[self.path_idx..]
     }
 
+    /// Returns the SPIFFE ID as a `SpiffeUrl`.
     pub fn url(&self) -> SpiffeUrl {
         if self.is_zero() {
             return SpiffeUrl::empty();
@@ -150,10 +171,12 @@ impl ID {
         SpiffeUrl::new("spiffe", self.trust_domain().name(), self.path())
     }
 
+    /// Returns `true` if the SPIFFE ID is empty/zero.
     pub fn is_zero(&self) -> bool {
         self.id.is_empty()
     }
 
+    /// Appends a path to the SPIFFE ID.
     pub fn append_path(&self, path: &str) -> Result<ID> {
         if self.is_zero() {
             return Err(Error::Other(
@@ -166,6 +189,7 @@ impl ID {
         Ok(id)
     }
 
+    /// Appends a formatted path to the SPIFFE ID.
     pub fn append_pathf(&self, args: std::fmt::Arguments<'_>) -> Result<ID> {
         if self.is_zero() {
             return Err(Error::Other(
@@ -178,6 +202,7 @@ impl ID {
         Ok(id)
     }
 
+    /// Appends path segments to the SPIFFE ID.
     pub fn append_segments(&self, segments: &[&str]) -> Result<ID> {
         if self.is_zero() {
             return Err(Error::Other(
@@ -190,6 +215,7 @@ impl ID {
         Ok(id)
     }
 
+    /// Replaces the path of the SPIFFE ID.
     pub fn replace_path(&self, path: &str) -> Result<ID> {
         if self.is_zero() {
             return Err(Error::Other(
@@ -199,6 +225,7 @@ impl ID {
         ID::from_path(self.trust_domain(), path)
     }
 
+    /// Replaces the path of the SPIFFE ID with a formatted string.
     pub fn replace_pathf(&self, args: std::fmt::Arguments<'_>) -> Result<ID> {
         if self.is_zero() {
             return Err(Error::Other(
@@ -209,6 +236,7 @@ impl ID {
         ID::from_path(self.trust_domain(), &path)
     }
 
+    /// Replaces the path of the SPIFFE ID with path segments.
     pub fn replace_segments(&self, segments: &[&str]) -> Result<ID> {
         if self.is_zero() {
             return Err(Error::Other(
@@ -219,6 +247,7 @@ impl ID {
         ID::from_path(self.trust_domain(), &path)
     }
 
+    /// Returns an empty/zero SPIFFE ID.
     pub fn zero() -> ID {
         ID {
             id: String::new(),

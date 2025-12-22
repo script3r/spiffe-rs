@@ -5,11 +5,18 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cmp::Ordering;
 use url::Url;
 
+/// A Trust Domain is a string that identifies a trust realm in a SPIFFE system.
+///
+/// It is usually the host part of a SPIFFE ID, e.g. `example.org`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TrustDomain {
     pub(crate) name: String,
 }
 
+/// Parses a `TrustDomain` from a string.
+///
+/// The string can be a trust domain name (e.g. `example.org`) or a full SPIFFE ID
+/// (e.g. `spiffe://example.org/path`).
 pub fn trust_domain_from_string(id_or_name: &str) -> Result<TrustDomain> {
     if id_or_name.is_empty() {
         return Err(Error::MissingTrustDomain);
@@ -28,32 +35,39 @@ pub fn trust_domain_from_string(id_or_name: &str) -> Result<TrustDomain> {
     })
 }
 
+/// Parses a `TrustDomain` from a `url::Url`.
 pub fn trust_domain_from_uri(uri: &Url) -> Result<TrustDomain> {
     let id = ID::from_uri(uri)?;
     Ok(id.trust_domain())
 }
 
 impl TrustDomain {
+    /// Returns the name of the trust domain.
     pub fn name(&self) -> &str {
         &self.name
     }
 
+    /// Returns the SPIFFE ID of the trust domain itself (e.g. `spiffe://example.org`).
     pub fn id(&self) -> ID {
         make_id(self, "").unwrap_or_else(|_| ID::zero())
     }
 
+    /// Returns the SPIFFE ID string of the trust domain.
     pub fn id_string(&self) -> String {
         self.id().to_string()
     }
 
+    /// Returns `true` if the trust domain is empty/zero.
     pub fn is_zero(&self) -> bool {
         self.name.is_empty()
     }
 
+    /// Compares two trust domains.
     pub fn compare(&self, other: &TrustDomain) -> Ordering {
         self.name.cmp(&other.name)
     }
 
+    /// Marshals the trust domain name to a byte vector.
     pub fn marshal_text(&self) -> Option<Vec<u8>> {
         if self.is_zero() {
             None
@@ -62,6 +76,7 @@ impl TrustDomain {
         }
     }
 
+    /// Unmarshals the trust domain name from a byte slice.
     pub fn unmarshal_text(&mut self, text: &[u8]) -> Result<()> {
         if text.is_empty() {
             *self = TrustDomain { name: String::new() };

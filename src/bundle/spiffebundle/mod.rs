@@ -46,6 +46,7 @@ fn strip_prefix(message: &str) -> &str {
     message.strip_prefix("spiffebundle: ").unwrap_or(message)
 }
 
+/// A SPIFFE bundle contains both X.509 and JWT authorities for a trust domain.
 #[derive(Debug)]
 pub struct Bundle {
     trust_domain: TrustDomain,
@@ -56,6 +57,7 @@ pub struct Bundle {
 }
 
 impl Bundle {
+    /// Creates a new empty `Bundle` for the given trust domain.
     pub fn new(trust_domain: TrustDomain) -> Bundle {
         Bundle {
             trust_domain,
@@ -66,12 +68,14 @@ impl Bundle {
         }
     }
 
+    /// Loads a SPIFFE bundle from a JSON file (JWKS).
     pub fn load(trust_domain: TrustDomain, path: &str) -> Result<Bundle> {
         let bytes =
             fs::read(path).map_err(|err| wrap_error(format!("unable to read SPIFFE bundle: {}", err)))?;
         Bundle::parse(trust_domain, &bytes)
     }
 
+    /// Reads a SPIFFE bundle from a reader.
     pub fn read(trust_domain: TrustDomain, reader: &mut dyn Read) -> Result<Bundle> {
         let mut bytes = Vec::new();
         reader
@@ -80,6 +84,7 @@ impl Bundle {
         Bundle::parse(trust_domain, &bytes)
     }
 
+    /// Parses a SPIFFE bundle from JSON bytes (JWKS).
     pub fn parse(trust_domain: TrustDomain, bytes: &[u8]) -> Result<Bundle> {
         let jwks: JwkDocument =
             serde_json::from_slice(bytes).map_err(|err| wrap_error(format!("unable to parse JWKS: {}", err)))?;
@@ -132,24 +137,28 @@ impl Bundle {
         Ok(bundle)
     }
 
+    /// Creates a SPIFFE bundle from an X.509 bundle.
     pub fn from_x509_bundle(x509_bundle: &x509bundle::Bundle) -> Bundle {
         let bundle = Bundle::new(x509_bundle.trust_domain());
         bundle.set_x509_authorities(&x509_bundle.x509_authorities());
         bundle
     }
 
+    /// Creates a SPIFFE bundle from a JWT bundle.
     pub fn from_jwt_bundle(jwt_bundle: &jwtbundle::Bundle) -> Bundle {
         let bundle = Bundle::new(jwt_bundle.trust_domain());
         bundle.set_jwt_authorities(&jwt_bundle.jwt_authorities());
         bundle
     }
 
+    /// Creates a SPIFFE bundle from X.509 authorities.
     pub fn from_x509_authorities(trust_domain: TrustDomain, authorities: &[Vec<u8>]) -> Bundle {
         let bundle = Bundle::new(trust_domain);
         bundle.set_x509_authorities(authorities);
         bundle
     }
 
+    /// Creates a SPIFFE bundle from JWT authorities.
     pub fn from_jwt_authorities(
         trust_domain: TrustDomain,
         jwt_authorities: &HashMap<String, JwtKey>,
@@ -159,10 +168,12 @@ impl Bundle {
         bundle
     }
 
+    /// Returns the trust domain of the bundle.
     pub fn trust_domain(&self) -> TrustDomain {
         self.trust_domain.clone()
     }
 
+    /// Returns the X.509 authorities in the bundle, DER encoded.
     pub fn x509_authorities(&self) -> Vec<Vec<u8>> {
         self.x509_authorities
             .read()
@@ -170,6 +181,7 @@ impl Bundle {
             .unwrap_or_default()
     }
 
+    /// Adds an X.509 authority to the bundle.
     pub fn add_x509_authority(&self, authority: &[u8]) {
         if let Ok(mut guard) = self.x509_authorities.write() {
             if guard.iter().any(|cert| cert == authority) {
@@ -179,6 +191,7 @@ impl Bundle {
         }
     }
 
+    /// Removes an X.509 authority from the bundle.
     pub fn remove_x509_authority(&self, authority: &[u8]) {
         if let Ok(mut guard) = self.x509_authorities.write() {
             if let Some(index) = guard.iter().position(|cert| cert == authority) {
@@ -187,6 +200,7 @@ impl Bundle {
         }
     }
 
+    /// Returns `true` if the bundle has the given X.509 authority.
     pub fn has_x509_authority(&self, authority: &[u8]) -> bool {
         self.x509_authorities
             .read()
@@ -194,12 +208,14 @@ impl Bundle {
             .unwrap_or(false)
     }
 
+    /// Sets the X.509 authorities in the bundle.
     pub fn set_x509_authorities(&self, authorities: &[Vec<u8>]) {
         if let Ok(mut guard) = self.x509_authorities.write() {
             *guard = x509util::copy_x509_authorities(authorities);
         }
     }
 
+    /// Returns the JWT authorities in the bundle.
     pub fn jwt_authorities(&self) -> HashMap<String, JwtKey> {
         self.jwt_authorities
             .read()
@@ -207,6 +223,7 @@ impl Bundle {
             .unwrap_or_default()
     }
 
+    /// Finds a JWT authority by its key ID.
     pub fn find_jwt_authority(&self, key_id: &str) -> Option<JwtKey> {
         self.jwt_authorities
             .read()
@@ -214,6 +231,7 @@ impl Bundle {
             .and_then(|guard| guard.get(key_id).cloned())
     }
 
+    /// Returns `true` if the bundle has an authority with the given key ID.
     pub fn has_jwt_authority(&self, key_id: &str) -> bool {
         self.jwt_authorities
             .read()
@@ -221,6 +239,7 @@ impl Bundle {
             .unwrap_or(false)
     }
 
+    /// Adds a JWT authority to the bundle.
     pub fn add_jwt_authority(&self, key_id: &str, jwt_authority: JwtKey) -> Result<()> {
         if key_id.is_empty() {
             return Err(wrap_error("keyID cannot be empty"));
@@ -231,18 +250,21 @@ impl Bundle {
         Ok(())
     }
 
+    /// Removes a JWT authority from the bundle.
     pub fn remove_jwt_authority(&self, key_id: &str) {
         if let Ok(mut guard) = self.jwt_authorities.write() {
             guard.remove(key_id);
         }
     }
 
+    /// Sets the JWT authorities in the bundle.
     pub fn set_jwt_authorities(&self, jwt_authorities: &HashMap<String, JwtKey>) {
         if let Ok(mut guard) = self.jwt_authorities.write() {
             *guard = jwtutil::copy_jwt_authorities(jwt_authorities);
         }
     }
 
+    /// Returns `true` if the bundle is empty.
     pub fn empty(&self) -> bool {
         let x509_empty = self
             .x509_authorities
@@ -257,38 +279,45 @@ impl Bundle {
         x509_empty && jwt_empty
     }
 
+    /// Returns the refresh hint for the bundle.
     pub fn refresh_hint(&self) -> Option<Duration> {
         self.refresh_hint.read().ok().and_then(|guard| *guard)
     }
 
+    /// Sets the refresh hint for the bundle.
     pub fn set_refresh_hint(&self, refresh_hint: Duration) {
         if let Ok(mut guard) = self.refresh_hint.write() {
             *guard = Some(refresh_hint);
         }
     }
 
+    /// Clears the refresh hint for the bundle.
     pub fn clear_refresh_hint(&self) {
         if let Ok(mut guard) = self.refresh_hint.write() {
             *guard = None;
         }
     }
 
+    /// Returns the sequence number of the bundle.
     pub fn sequence_number(&self) -> Option<u64> {
         self.sequence_number.read().ok().and_then(|guard| *guard)
     }
 
+    /// Sets the sequence number of the bundle.
     pub fn set_sequence_number(&self, sequence_number: u64) {
         if let Ok(mut guard) = self.sequence_number.write() {
             *guard = Some(sequence_number);
         }
     }
 
+    /// Clears the sequence number of the bundle.
     pub fn clear_sequence_number(&self) {
         if let Ok(mut guard) = self.sequence_number.write() {
             *guard = None;
         }
     }
 
+    /// Marshals the bundle to JSON bytes (JWKS).
     pub fn marshal(&self) -> Result<Vec<u8>> {
         let mut keys = Vec::new();
         let refresh_hint = self.refresh_hint();
@@ -314,6 +343,7 @@ impl Bundle {
         serde_json::to_vec(&doc).map_err(|err| wrap_error(err))
     }
 
+    /// Clones the bundle.
     pub fn clone_bundle(&self) -> Bundle {
         let bundle = Bundle::new(self.trust_domain());
         if let Some(refresh_hint) = self.refresh_hint() {
@@ -327,14 +357,17 @@ impl Bundle {
         bundle
     }
 
+    /// Returns the X.509 bundle view of this bundle.
     pub fn x509_bundle(&self) -> x509bundle::Bundle {
         x509bundle::Bundle::from_x509_authorities(self.trust_domain(), &self.x509_authorities())
     }
 
+    /// Returns the JWT bundle view of this bundle.
     pub fn jwt_bundle(&self) -> jwtbundle::Bundle {
         jwtbundle::Bundle::from_jwt_authorities(self.trust_domain(), &self.jwt_authorities())
     }
 
+    /// Returns the bundle for the given trust domain if it matches.
     pub fn get_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<Bundle> {
         if self.trust_domain != trust_domain {
             return Err(wrap_error(format!(
@@ -345,6 +378,7 @@ impl Bundle {
         Ok(self.clone_bundle())
     }
 
+    /// Returns the X.509 bundle for the given trust domain if it matches.
     pub fn get_x509_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<x509bundle::Bundle> {
         if self.trust_domain != trust_domain {
             return Err(wrap_error(format!(
@@ -355,6 +389,7 @@ impl Bundle {
         Ok(self.x509_bundle())
     }
 
+    /// Returns the JWT bundle for the given trust domain if it matches.
     pub fn get_jwt_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<jwtbundle::Bundle> {
         if self.trust_domain != trust_domain {
             return Err(wrap_error(format!(
@@ -365,6 +400,7 @@ impl Bundle {
         Ok(self.jwt_bundle())
     }
 
+    /// Returns `true` if this bundle is equal to another bundle.
     pub fn equal(&self, other: &Bundle) -> bool {
         self.trust_domain == other.trust_domain
             && self.refresh_hint() == other.refresh_hint()
@@ -374,16 +410,20 @@ impl Bundle {
     }
 }
 
+/// A source of SPIFFE bundles.
 pub trait Source {
+    /// Returns the SPIFFE bundle for the given trust domain.
     fn get_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<Bundle>;
 }
 
+/// A set of SPIFFE bundles for multiple trust domains.
 #[derive(Debug)]
 pub struct Set {
     bundles: RwLock<HashMap<TrustDomain, Bundle>>,
 }
 
 impl Set {
+    /// Creates a new `Set` from the given bundles.
     pub fn new(bundles: &[Bundle]) -> Set {
         let mut map = HashMap::new();
         for bundle in bundles {
@@ -394,18 +434,21 @@ impl Set {
         }
     }
 
+    /// Adds a bundle to the set.
     pub fn add(&self, bundle: &Bundle) {
         if let Ok(mut guard) = self.bundles.write() {
             guard.insert(bundle.trust_domain(), bundle.clone_bundle());
         }
     }
 
+    /// Removes the bundle for the given trust domain from the set.
     pub fn remove(&self, trust_domain: TrustDomain) {
         if let Ok(mut guard) = self.bundles.write() {
             guard.remove(&trust_domain);
         }
     }
 
+    /// Returns `true` if the set has a bundle for the given trust domain.
     pub fn has(&self, trust_domain: TrustDomain) -> bool {
         self.bundles
             .read()
@@ -413,6 +456,7 @@ impl Set {
             .unwrap_or(false)
     }
 
+    /// Returns the bundle for the given trust domain from the set.
     pub fn get(&self, trust_domain: TrustDomain) -> Option<Bundle> {
         self.bundles
             .read()
@@ -420,6 +464,7 @@ impl Set {
             .and_then(|guard| guard.get(&trust_domain).map(|b| b.clone_bundle()))
     }
 
+    /// Returns all bundles in the set.
     pub fn bundles(&self) -> Vec<Bundle> {
         let mut bundles = self
             .bundles
@@ -430,10 +475,12 @@ impl Set {
         bundles
     }
 
+    /// Returns the number of bundles in the set.
     pub fn len(&self) -> usize {
         self.bundles.read().map(|guard| guard.len()).unwrap_or(0)
     }
 
+    /// Returns the SPIFFE bundle for the given trust domain.
     pub fn get_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<Bundle> {
         let guard = self
             .bundles
@@ -448,6 +495,7 @@ impl Set {
         Ok(bundle.clone_bundle())
     }
 
+    /// Returns the X.509 bundle for the given trust domain.
     pub fn get_x509_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<x509bundle::Bundle> {
         let guard = self
             .bundles
@@ -462,6 +510,7 @@ impl Set {
         Ok(bundle.x509_bundle())
     }
 
+    /// Returns the JWT bundle for the given trust domain.
     pub fn get_jwt_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<jwtbundle::Bundle> {
         let guard = self
             .bundles

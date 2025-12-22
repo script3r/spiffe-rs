@@ -33,24 +33,37 @@ fn wrap_error(message: impl std::fmt::Display) -> Error {
     Error(format!("jwtsvid: {}", message))
 }
 
+/// A JWT SVID (SPIFFE Verifiable Identity Document).
+///
+/// It consists of a JWT token and its parsed claims.
 #[derive(Debug, Clone)]
 pub struct SVID {
+    /// The SPIFFE ID of the SVID.
     pub id: ID,
+    /// The audience the SVID is intended for.
     pub audience: Vec<String>,
+    /// The expiry time of the SVID.
     pub expiry: SystemTime,
+    /// The claims contained in the JWT SVID.
     pub claims: HashMap<String, Value>,
+    /// An optional hint for the SVID.
     pub hint: String,
     token: String,
 }
 
+/// Parameters for issuing a JWT SVID.
 #[derive(Debug, Clone)]
 pub struct Params {
+    /// The subject SPIFFE ID.
     pub subject: ID,
+    /// The primary audience.
     pub audience: String,
+    /// Additional audiences.
     pub extra_audiences: Vec<String>,
 }
 
 impl Params {
+    /// Creates a new `Params` with a subject and primary audience.
     pub fn new(subject: ID, audience: impl Into<String>) -> Self {
         Self {
             subject,
@@ -59,11 +72,13 @@ impl Params {
         }
     }
 
+    /// Adds an extra audience to the parameters.
     pub fn with_extra_audience(mut self, audience: impl Into<String>) -> Self {
         self.extra_audiences.push(audience.into());
         self
     }
 
+    /// Returns the full list of audiences.
     pub fn audience_list(&self) -> Vec<String> {
         let mut audiences = Vec::with_capacity(1 + self.extra_audiences.len());
         audiences.push(self.audience.clone());
@@ -73,11 +88,16 @@ impl Params {
 }
 
 impl SVID {
+    /// Returns the JWT token string.
     pub fn marshal(&self) -> String {
         self.token.clone()
     }
 }
 
+/// Parses and validates a JWT SVID token.
+///
+/// It uses the provided bundle source to verify the token signature and checks
+/// the audience claim.
 pub fn parse_and_validate(
     token: &str,
     bundles: &dyn jwtbundle::Source,
@@ -108,6 +128,10 @@ pub fn parse_and_validate(
     })
 }
 
+/// Parses a JWT SVID token without validating its signature.
+///
+/// **WARNING**: This should only be used if the token has already been validated
+/// by other means.
 pub fn parse_insecure(token: &str, audience: &[String]) -> Result<SVID> {
     parse(token, audience, |_header, _signing_input, _signature, _td| Ok(()))
 }

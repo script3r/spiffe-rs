@@ -11,6 +11,7 @@ pub use mode::*;
 pub use option::*;
 pub use peerid::{peer_id_from_stream, PeerIdGetter};
 
+/// An error that occurred during a SPIFFE-TLS operation.
 #[derive(Debug, Clone)]
 pub struct Error(String);
 
@@ -22,6 +23,7 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+/// A specialized Result type for SPIFFE-TLS operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
 fn wrap_error(message: impl std::fmt::Display) -> Error {

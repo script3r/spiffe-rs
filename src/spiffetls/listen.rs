@@ -4,6 +4,7 @@ use std::io::{Read, Write};
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::Arc;
 
+/// A SPIFFE-TLS listener.
 pub struct Listener {
     inner: TcpListener,
     config: Arc<rustls::ServerConfig>,
@@ -11,6 +12,7 @@ pub struct Listener {
 }
 
 impl Listener {
+    /// Accepts a new connection and performs the TLS handshake.
     pub fn accept(&self) -> Result<ServerStream> {
         let (sock, _addr) = self.inner.accept().map_err(|err| crate::spiffetls::wrap_error(err))?;
         let conn = rustls::ServerConnection::new(self.config.clone())
@@ -20,10 +22,12 @@ impl Listener {
         })
     }
 
+    /// Returns the local address the listener is bound to.
     pub fn local_addr(&self) -> Result<SocketAddr> {
         self.inner.local_addr().map_err(|err| crate::spiffetls::wrap_error(err))
     }
 
+    /// Closes the listener and its underlying source if it was created by the listener.
     pub async fn close(self) -> Result<()> {
         if let Some(source) = self.source {
             source.close().await.map_err(|err| crate::spiffetls::Error(err.to_string()))?;
@@ -32,11 +36,13 @@ impl Listener {
     }
 }
 
+/// A SPIFFE-TLS server stream.
 pub struct ServerStream {
     inner: rustls::StreamOwned<rustls::ServerConnection, TcpStream>,
 }
 
 impl ServerStream {
+    /// Returns the SPIFFE ID of the peer.
     pub fn peer_id(&self) -> Result<crate::spiffeid::ID> {
         crate::spiffetls::peer_id_from_stream(self.inner.conn.peer_certificates())
     }
@@ -58,6 +64,7 @@ impl Write for ServerStream {
     }
 }
 
+/// Listens for SPIFFE-TLS connections using mutual TLS.
 pub async fn listen(
     ctx: &Context,
     addr: &str,
@@ -67,6 +74,7 @@ pub async fn listen(
     listen_with_mode(ctx, addr, crate::spiffetls::mtls_server(authorizer), options).await
 }
 
+/// Listens for SPIFFE-TLS connections with the given mode.
 pub async fn listen_with_mode(
     ctx: &Context,
     addr: &str,

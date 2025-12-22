@@ -1,12 +1,14 @@
 use crate::spiffeid::charset::is_backcompat_path_char;
 use crate::spiffeid::{Error, Result};
 
+/// Formats a path component using standard formatting arguments and validates it.
 pub fn format_path(args: std::fmt::Arguments<'_>) -> Result<String> {
     let path = format!("{}", args);
     validate_path(&path)?;
     Ok(path)
 }
 
+/// Joins multiple path segments into a single path and validates each segment.
 pub fn join_path_segments(segments: &[&str]) -> Result<String> {
     let mut out = String::new();
     for segment in segments {
@@ -17,6 +19,9 @@ pub fn join_path_segments(segments: &[&str]) -> Result<String> {
     Ok(out)
 }
 
+/// Validates a SPIFFE ID path component.
+///
+/// It must start with a forward slash and follow SPIFFE path rules.
 pub fn validate_path(path: &str) -> Result<()> {
     if path.is_empty() {
         return Ok(());
@@ -49,6 +54,7 @@ pub fn validate_path(path: &str) -> Result<()> {
     }
 }
 
+/// Validates a single SPIFFE ID path segment.
 pub fn validate_path_segment(segment: &str) -> Result<()> {
     match segment {
         "" => return Err(Error::EmptySegment),

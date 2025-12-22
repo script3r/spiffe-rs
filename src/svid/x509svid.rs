@@ -34,15 +34,23 @@ fn wrap_error(message: impl std::fmt::Display) -> Error {
     Error(format!("x509svid: {}", message))
 }
 
+/// An X.509 SVID (SPIFFE Verifiable Identity Document).
+///
+/// It consists of an X.509 certificate chain and a private key.
 #[derive(Debug, Clone)]
 pub struct SVID {
+    /// The SPIFFE ID of the SVID.
     pub id: ID,
+    /// The X.509 certificate chain, DER encoded.
     pub certificates: Vec<Vec<u8>>,
+    /// The private key, DER encoded.
     pub private_key: Vec<u8>,
+    /// An optional hint for the SVID.
     pub hint: String,
 }
 
 impl SVID {
+    /// Loads an X.509 SVID from PEM encoded files.
     pub fn load(cert_file: &str, key_file: &str) -> Result<SVID> {
         let cert_bytes = fs::read(cert_file)
             .map_err(|err| wrap_error(format!("cannot read certificate file: {}", err)))?;
@@ -51,6 +59,7 @@ impl SVID {
         SVID::parse(&cert_bytes, &key_bytes)
     }
 
+    /// Parses an X.509 SVID from PEM encoded bytes.
     pub fn parse(cert_bytes: &[u8], key_bytes: &[u8]) -> Result<SVID> {
         let certs =
             pemutil::parse_certificates(cert_bytes).map_err(|err| {
@@ -61,6 +70,7 @@ impl SVID {
         new_svid(certs, key)
     }
 
+    /// Parses an X.509 SVID from DER encoded bytes.
     pub fn parse_raw(cert_bytes: &[u8], key_bytes: &[u8]) -> Result<SVID> {
         let certs = parse_raw_certificates(cert_bytes)
             .map_err(|err| wrap_error(format!("cannot parse DER encoded certificate: {}", err)))?;
@@ -69,6 +79,7 @@ impl SVID {
         new_svid(certs, key)
     }
 
+    /// Marshals the SVID to PEM encoded bytes.
     pub fn marshal(&self) -> Result<(Vec<u8>, Vec<u8>)> {
         if self.certificates.is_empty() {
             return Err(wrap_error("no certificates to marshal"));
@@ -83,6 +94,7 @@ impl SVID {
         Ok((cert_bytes, key_bytes))
     }
 
+    /// Marshals the SVID to DER encoded bytes.
     pub fn marshal_raw(&self) -> Result<(Vec<u8>, Vec<u8>)> {
         if self.certificates.is_empty() {
             return Err(wrap_error("no certificates to marshal"));
@@ -97,12 +109,15 @@ impl SVID {
         Ok((certs, self.private_key.clone()))
     }
 
+    /// Returns the SVID itself (satisfies `Source` trait).
     pub fn get_x509_svid(&self) -> Result<SVID> {
         Ok(self.clone())
     }
 }
 
+/// A source of X.509 SVIDs.
 pub trait Source {
+    /// Returns an X.509 SVID.
     fn get_x509_svid(&self) -> Result<SVID>;
 }
 

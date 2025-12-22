@@ -17,12 +17,17 @@ use tonic::metadata::MetadataValue;
 use tonic::transport::{Channel, Endpoint};
 use tonic::{Code, Request, Status};
 
+/// A client for the SPIFFE Workload API.
+///
+/// This client can be used to fetch X.509 and JWT SVIDs and bundles from a
+/// Workload API endpoint.
 pub struct Client {
     inner: SpiffeWorkloadApiClient<Channel>,
     config: ClientConfig,
 }
 
 impl Client {
+    /// Creates a new `Client` with the given options.
     pub async fn new<I>(options: I) -> Result<Client>
     where
         I: IntoIterator<Item = Arc<dyn crate::workloadapi::ClientOption>>,
@@ -44,10 +49,12 @@ impl Client {
         Ok(Client { inner, config })
     }
 
+    /// Closes the client.
     pub async fn close(&self) -> Result<()> {
         Ok(())
     }
 
+    /// Fetches a single X.509 SVID from the Workload API.
     pub async fn fetch_x509_svid(&self, ctx: &Context) -> Result<x509svid::SVID> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(X509svidRequest {}));
@@ -60,6 +67,7 @@ impl Client {
             .ok_or_else(|| wrap_error("no SVIDs in response"))?)
     }
 
+    /// Fetches all X.509 SVIDs from the Workload API.
     pub async fn fetch_x509_svids(&self, ctx: &Context) -> Result<Vec<x509svid::SVID>> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(X509svidRequest {}));
@@ -68,6 +76,7 @@ impl Client {
         parse_x509_svids(response, false)
     }
 
+    /// Fetches X.509 bundles from the Workload API.
     pub async fn fetch_x509_bundles(&self, ctx: &Context) -> Result<x509bundle::Set> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(X509BundlesRequest {}));
@@ -76,6 +85,7 @@ impl Client {
         parse_x509_bundles_response(resp)
     }
 
+    /// Watches for X.509 bundle updates from the Workload API.
     pub async fn watch_x509_bundles(&self, ctx: &Context, watcher: Arc<dyn X509BundleWatcher>) -> Result<()> {
         let mut backoff = self.config.backoff_strategy.new_backoff();
         loop {
@@ -88,6 +98,7 @@ impl Client {
         }
     }
 
+    /// Fetches the X.509 context (SVIDs and bundles) from the Workload API.
     pub async fn fetch_x509_context(&self, ctx: &Context) -> Result<crate::workloadapi::X509Context> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(X509svidRequest {}));
@@ -96,6 +107,7 @@ impl Client {
         parse_x509_context(response)
     }
 
+    /// Watches for X.509 context updates from the Workload API.
     pub async fn watch_x509_context(
         &self,
         ctx: &Context,
@@ -112,6 +124,7 @@ impl Client {
         }
     }
 
+    /// Fetches a single JWT SVID from the Workload API.
     pub async fn fetch_jwt_svid(&self, ctx: &Context, params: jwtsvid::Params) -> Result<jwtsvid::SVID> {
         let mut client = self.inner.clone();
         let audience = params.audience_list();
@@ -127,6 +140,7 @@ impl Client {
             .ok_or_else(|| wrap_error("there were no SVIDs in the response"))?)
     }
 
+    /// Fetches multiple JWT SVIDs from the Workload API.
     pub async fn fetch_jwt_svids(&self, ctx: &Context, params: jwtsvid::Params) -> Result<Vec<jwtsvid::SVID>> {
         let mut client = self.inner.clone();
         let audience = params.audience_list();
@@ -138,6 +152,7 @@ impl Client {
         parse_jwt_svids(response.into_inner(), &audience, false)
     }
 
+    /// Fetches JWT bundles from the Workload API.
     pub async fn fetch_jwt_bundles(&self, ctx: &Context) -> Result<jwtbundle::Set> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(JwtBundlesRequest {}));
@@ -146,6 +161,7 @@ impl Client {
         parse_jwt_bundles(resp)
     }
 
+    /// Watches for JWT bundle updates from the Workload API.
     pub async fn watch_jwt_bundles(&self, ctx: &Context, watcher: Arc<dyn JWTBundleWatcher>) -> Result<()> {
         let mut backoff = self.config.backoff_strategy.new_backoff();
         loop {
@@ -158,6 +174,7 @@ impl Client {
         }
     }
 
+    /// Validates a JWT SVID token using the Workload API.
     pub async fn validate_jwt_svid(&self, ctx: &Context, token: &str, audience: &str) -> Result<jwtsvid::SVID> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(ValidateJwtsvidRequest {

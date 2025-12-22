@@ -7,16 +7,19 @@ use std::net::TcpStream;
 use std::sync::Arc;
 use x509_parser::extensions::GeneralName;
 
+/// A SPIFFE-TLS client stream.
 pub struct ClientStream {
     inner: rustls::StreamOwned<rustls::ClientConnection, TcpStream>,
     source: Option<Arc<X509Source>>,
 }
 
 impl ClientStream {
+    /// Returns the SPIFFE ID of the peer.
     pub fn peer_id(&self) -> Result<ID> {
         peer_id_from_certs(self.inner.conn.peer_certificates())
     }
 
+    /// Closes the stream and its underlying source if it was created by the client.
     pub async fn close(self) -> Result<()> {
         if let Some(source) = self.source {
             source.close().await.map_err(|err| Error(err.to_string()))?;
@@ -41,6 +44,7 @@ impl Write for ClientStream {
     }
 }
 
+/// Dials a SPIFFE-TLS server using mutual TLS.
 pub async fn dial(
     ctx: &Context,
     addr: &str,
@@ -51,6 +55,7 @@ pub async fn dial(
     dial_with_mode(ctx, addr, server_name, crate::spiffetls::mtls_client(authorizer), options).await
 }
 
+/// Dials a SPIFFE-TLS server with the given mode.
 pub async fn dial_with_mode(
     ctx: &Context,
     addr: &str,

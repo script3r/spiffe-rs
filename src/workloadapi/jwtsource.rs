@@ -4,6 +4,8 @@ use crate::workloadapi::option::{JWTSourceConfig, JWTSourceOption};
 use crate::workloadapi::{Context, Result, Watcher};
 use std::sync::{Arc, RwLock};
 
+/// A source of JWT SVIDs and bundles that is kept up-to-date by watching the
+/// Workload API.
 pub struct JWTSource {
     watcher: Watcher,
     picker: Option<Arc<dyn Fn(&[jwtsvid::SVID]) -> jwtsvid::SVID + Send + Sync>>,
@@ -12,6 +14,9 @@ pub struct JWTSource {
 }
 
 impl JWTSource {
+    /// Creates a new `JWTSource` with the given options.
+    ///
+    /// It starts watching the Workload API for updates.
     pub async fn new<I>(ctx: &Context, options: I) -> Result<JWTSource>
     where
         I: IntoIterator<Item = Arc<dyn JWTSourceOption>>,
@@ -38,11 +43,13 @@ impl JWTSource {
         })
     }
 
+    /// Closes the source.
     pub async fn close(&self) -> Result<()> {
         self.closed.store(true, std::sync::atomic::Ordering::SeqCst);
         self.watcher.close().await
     }
 
+    /// Fetches a JWT SVID with the given parameters.
     pub async fn fetch_jwt_svid(
         &self,
         ctx: &Context,
@@ -56,6 +63,7 @@ impl JWTSource {
         self.watcher.client.fetch_jwt_svid(ctx, params).await
     }
 
+    /// Fetches multiple JWT SVIDs with the given parameters.
     pub async fn fetch_jwt_svids(
         &self,
         ctx: &Context,
@@ -65,6 +73,7 @@ impl JWTSource {
         self.watcher.client.fetch_jwt_svids(ctx, params).await
     }
 
+    /// Returns the JWT bundle for the given trust domain.
     pub fn get_jwt_bundle_for_trust_domain(
         &self,
         trust_domain: crate::spiffeid::TrustDomain,
@@ -77,10 +86,12 @@ impl JWTSource {
             .ok_or_else(|| crate::workloadapi::Error::new("jwtsource: no JWT bundle found"))
     }
 
+    /// Waits until the source has been updated for the first time.
     pub async fn wait_until_updated(&self, ctx: &Context) -> Result<()> {
         self.watcher.wait_until_updated(ctx).await
     }
 
+    /// Returns a receiver that can be used to watch for updates to the source.
     pub fn updated(&self) -> tokio::sync::watch::Receiver<u64> {
         self.watcher.updated()
     }

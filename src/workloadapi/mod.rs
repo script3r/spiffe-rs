@@ -20,6 +20,7 @@ pub mod proto {
     include!(concat!(env!("OUT_DIR"), "/_.rs"));
 }
 
+/// An error that occurred during a Workload API operation.
 #[derive(Debug, Clone)]
 pub struct Error {
     message: String,
@@ -34,6 +35,7 @@ impl std::fmt::Display for Error {
 
 impl std::error::Error for Error {}
 
+/// A specialized Result type for Workload API operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
 fn wrap_error(message: impl std::fmt::Display) -> Error {
@@ -44,6 +46,7 @@ fn wrap_error(message: impl std::fmt::Display) -> Error {
 }
 
 impl Error {
+    /// Returns the underlying gRPC status if the error was caused by a gRPC failure.
     pub fn status(&self) -> Option<&tonic::Status> {
         self.status.as_ref()
     }
@@ -65,8 +68,10 @@ impl From<tonic::Status> for Error {
     }
 }
 
+/// A context for Workload API operations, used for cancellation.
 pub type Context = tokio_util::sync::CancellationToken;
 
+/// Returns a new background context.
 pub fn background() -> Context {
     tokio_util::sync::CancellationToken::new()
 }

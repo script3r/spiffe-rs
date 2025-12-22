@@ -2,13 +2,19 @@ use std::fmt;
 use std::io::{self, Write};
 use std::sync::Mutex;
 
+/// A trait for logging in the SPIFFE library.
 pub trait Logger: Send + Sync {
+    /// Logs a debug message.
     fn debugf(&self, args: fmt::Arguments<'_>);
+    /// Logs an info message.
     fn infof(&self, args: fmt::Arguments<'_>);
+    /// Logs a warning message.
     fn warnf(&self, args: fmt::Arguments<'_>);
+    /// Logs an error message.
     fn errorf(&self, args: fmt::Arguments<'_>);
 }
 
+/// A logger that writes to standard error.
 pub struct StdLogger;
 
 impl Logger for StdLogger {
@@ -29,6 +35,7 @@ impl Logger for StdLogger {
     }
 }
 
+/// A logger that discards all messages.
 pub struct NullLogger;
 
 impl Logger for NullLogger {
@@ -38,11 +45,13 @@ impl Logger for NullLogger {
     fn errorf(&self, _args: fmt::Arguments<'_>) {}
 }
 
+/// A logger that writes to a `std::io::Write` implementation.
 pub struct WriterLogger<W: Write + Send + Sync> {
     writer: Mutex<W>,
 }
 
 impl<W: Write + Send + Sync> WriterLogger<W> {
+    /// Creates a new `WriterLogger` for the given writer.
     pub fn new(writer: W) -> Self {
         Self {
             writer: Mutex::new(writer),

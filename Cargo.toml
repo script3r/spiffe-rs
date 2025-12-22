@@ -1,6 +1,6 @@
 [package]
 name = "spiffe-rs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 description = "Rust port of spiffe-go with SPIFFE IDs, bundles, SVIDs, Workload API client, federation helpers, and rustls-based SPIFFE TLS utilities."
 license = "Apache-2.0"

@@ -37,6 +37,7 @@ fn strip_prefix(message: &str) -> &str {
     message.strip_prefix("jwtbundle: ").unwrap_or(message)
 }
 
+/// A JWT bundle contains the JWT authorities (public keys) for a trust domain.
 #[derive(Debug)]
 pub struct Bundle {
     trust_domain: TrustDomain,
@@ -44,6 +45,7 @@ pub struct Bundle {
 }
 
 impl Bundle {
+    /// Creates a new empty `Bundle` for the given trust domain.
     pub fn new(trust_domain: TrustDomain) -> Bundle {
         Bundle {
             trust_domain,
@@ -51,6 +53,7 @@ impl Bundle {
         }
     }
 
+    /// Creates a new `Bundle` for the given trust domain and authorities.
     pub fn from_jwt_authorities(
         trust_domain: TrustDomain,
         jwt_authorities: &HashMap<String, JwtKey>,
@@ -61,12 +64,14 @@ impl Bundle {
         }
     }
 
+    /// Loads a JWT bundle from a JSON file (JWKS).
     pub fn load(trust_domain: TrustDomain, path: &str) -> Result<Bundle> {
         let bytes =
             fs::read(path).map_err(|err| wrap_error(format!("unable to read JWT bundle: {}", err)))?;
         Bundle::parse(trust_domain, &bytes)
     }
 
+    /// Reads a JWT bundle from a reader.
     pub fn read(trust_domain: TrustDomain, reader: &mut dyn Read) -> Result<Bundle> {
         let mut bytes = Vec::new();
         reader
@@ -75,6 +80,7 @@ impl Bundle {
         Bundle::parse(trust_domain, &bytes)
     }
 
+    /// Parses a JWT bundle from JSON bytes (JWKS).
     pub fn parse(trust_domain: TrustDomain, bytes: &[u8]) -> Result<Bundle> {
         let jwks: JwkDocument =
             serde_json::from_slice(bytes).map_err(|err| wrap_error(format!("unable to parse JWKS: {}", err)))?;
@@ -96,10 +102,12 @@ impl Bundle {
         Ok(bundle)
     }
 
+    /// Returns the trust domain of the bundle.
     pub fn trust_domain(&self) -> TrustDomain {
         self.trust_domain.clone()
     }
 
+    /// Returns the JWT authorities in the bundle.
     pub fn jwt_authorities(&self) -> HashMap<String, JwtKey> {
         self.jwt_authorities
             .read()
@@ -107,6 +115,7 @@ impl Bundle {
             .unwrap_or_default()
     }
 
+    /// Finds a JWT authority by its key ID.
     pub fn find_jwt_authority(&self, key_id: &str) -> Option<JwtKey> {
         self.jwt_authorities
             .read()
@@ -114,6 +123,7 @@ impl Bundle {
             .and_then(|guard| guard.get(key_id).cloned())
     }
 
+    /// Returns `true` if the bundle has an authority with the given key ID.
     pub fn has_jwt_authority(&self, key_id: &str) -> bool {
         self.jwt_authorities
             .read()
@@ -121,6 +131,7 @@ impl Bundle {
             .unwrap_or(false)
     }
 
+    /// Adds a JWT authority to the bundle.
     pub fn add_jwt_authority(&self, key_id: &str, jwt_authority: JwtKey) -> Result<()> {
         if key_id.is_empty() {
             return Err(wrap_error("keyID cannot be empty"));
@@ -131,18 +142,21 @@ impl Bundle {
         Ok(())
     }
 
+    /// Removes a JWT authority from the bundle.
     pub fn remove_jwt_authority(&self, key_id: &str) {
         if let Ok(mut guard) = self.jwt_authorities.write() {
             guard.remove(key_id);
         }
     }
 
+    /// Sets the JWT authorities in the bundle.
     pub fn set_jwt_authorities(&self, jwt_authorities: &HashMap<String, JwtKey>) {
         if let Ok(mut guard) = self.jwt_authorities.write() {
             *guard = jwtutil::copy_jwt_authorities(jwt_authorities);
         }
     }
 
+    /// Returns `true` if the bundle is empty.
     pub fn empty(&self) -> bool {
         self.jwt_authorities
             .read()
@@ -150,6 +164,7 @@ impl Bundle {
             .unwrap_or(true)
     }
 
+    /// Marshals the bundle to JSON bytes (JWKS).
     pub fn marshal(&self) -> Result<Vec<u8>> {
         let mut keys = Vec::new();
         let authorities = self.jwt_authorities();
@@ -160,15 +175,18 @@ impl Bundle {
         serde_json::to_vec(&jwks).map_err(|err| wrap_error(err))
     }
 
+    /// Clones the bundle.
     pub fn clone_bundle(&self) -> Bundle {
         Bundle::from_jwt_authorities(self.trust_domain(), &self.jwt_authorities())
     }
 
+    /// Returns `true` if this bundle is equal to another bundle.
     pub fn equal(&self, other: &Bundle) -> bool {
         self.trust_domain == other.trust_domain
             && jwtutil::jwt_authorities_equal(&self.jwt_authorities(), &other.jwt_authorities())
     }
 
+    /// Returns the bundle for the given trust domain if it matches.
     pub fn get_jwt_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<Bundle> {
         if self.trust_domain != trust_domain {
             return Err(wrap_error(format!(
@@ -180,16 +198,20 @@ impl Bundle {
     }
 }
 
+/// A source of JWT bundles.
 pub trait Source {
+    /// Returns the JWT bundle for the given trust domain.
     fn get_jwt_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<Bundle>;
 }
 
+/// A set of JWT bundles for multiple trust domains.
 #[derive(Debug)]
 pub struct Set {
     bundles: RwLock<HashMap<TrustDomain, Bundle>>,
 }
 
 impl Set {
+    /// Creates a new `Set` from the given bundles.
     pub fn new(bundles: &[Bundle]) -> Set {
         let mut map = HashMap::new();
         for bundle in bundles {
@@ -200,18 +222,21 @@ impl Set {
         }
     }
 
+    /// Adds a bundle to the set.
     pub fn add(&self, bundle: &Bundle) {
         if let Ok(mut guard) = self.bundles.write() {
             guard.insert(bundle.trust_domain(), bundle.clone_bundle());
         }
     }
 
+    /// Removes the bundle for the given trust domain from the set.
     pub fn remove(&self, trust_domain: TrustDomain) {
         if let Ok(mut guard) = self.bundles.write() {
             guard.remove(&trust_domain);
         }
     }
 
+    /// Returns `true` if the set has a bundle for the given trust domain.
     pub fn has(&self, trust_domain: TrustDomain) -> bool {
         self.bundles
             .read()
@@ -219,6 +244,7 @@ impl Set {
             .unwrap_or(false)
     }
 
+    /// Returns the bundle for the given trust domain from the set.
     pub fn get(&self, trust_domain: TrustDomain) -> Option<Bundle> {
         self.bundles
             .read()
@@ -226,6 +252,7 @@ impl Set {
             .and_then(|guard| guard.get(&trust_domain).map(|b| b.clone_bundle()))
     }
 
+    /// Returns all bundles in the set.
     pub fn bundles(&self) -> Vec<Bundle> {
         let mut bundles = self
             .bundles
@@ -236,10 +263,12 @@ impl Set {
         bundles
     }
 
+    /// Returns the number of bundles in the set.
     pub fn len(&self) -> usize {
         self.bundles.read().map(|guard| guard.len()).unwrap_or(0)
     }
 
+    /// Returns the JWT bundle for the given trust domain.
     pub fn get_jwt_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<Bundle> {
         let guard = self
             .bundles

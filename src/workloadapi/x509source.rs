@@ -4,6 +4,8 @@ use crate::workloadapi::option::{X509SourceConfig, X509SourceOption};
 use crate::workloadapi::{Context, Result, Watcher, X509Context};
 use std::sync::{Arc, RwLock};
 
+/// A source of X.509 SVIDs and bundles that is kept up-to-date by watching the
+/// Workload API.
 pub struct X509Source {
     watcher: Watcher,
     svid: Arc<RwLock<Option<x509svid::SVID>>>,
@@ -12,6 +14,9 @@ pub struct X509Source {
 }
 
 impl X509Source {
+    /// Creates a new `X509Source` with the given options.
+    ///
+    /// It starts watching the Workload API for updates.
     pub async fn new<I>(ctx: &Context, options: I) -> Result<X509Source>
     where
         I: IntoIterator<Item = Arc<dyn X509SourceOption>>,
@@ -51,11 +56,13 @@ impl X509Source {
         })
     }
 
+    /// Closes the source.
     pub async fn close(&self) -> Result<()> {
         self.closed.store(true, std::sync::atomic::Ordering::SeqCst);
         self.watcher.close().await
     }
 
+    /// Returns the current X.509 SVID.
     pub fn get_x509_svid(&self) -> Result<x509svid::SVID> {
         self.check_closed()?;
         self.svid
@@ -65,6 +72,7 @@ impl X509Source {
             .ok_or_else(|| crate::workloadapi::Error::new("x509source: missing X509-SVID"))
     }
 
+    /// Returns the X.509 bundle for the given trust domain.
     pub fn get_x509_bundle_for_trust_domain(
         &self,
         trust_domain: crate::spiffeid::TrustDomain,
@@ -77,10 +85,12 @@ impl X509Source {
             .ok_or_else(|| crate::workloadapi::Error::new("x509source: no X.509 bundle found"))
     }
 
+    /// Waits until the source has been updated for the first time.
     pub async fn wait_until_updated(&self, ctx: &Context) -> Result<()> {
         self.watcher.wait_until_updated(ctx).await
     }
 
+    /// Returns a receiver that can be used to watch for updates to the source.
     pub fn updated(&self) -> tokio::sync::watch::Receiver<u64> {
         self.watcher.updated()
     }
