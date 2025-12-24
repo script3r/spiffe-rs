@@ -146,7 +146,9 @@ impl ID {
     /// Returns the trust domain of the SPIFFE ID.
     pub fn trust_domain(&self) -> TrustDomain {
         if self.is_zero() {
-            return TrustDomain { name: String::new() };
+            return TrustDomain {
+                name: String::new(),
+            };
         }
         TrustDomain {
             name: self.id[SCHEME_PREFIX.len()..self.path_idx].to_string(),

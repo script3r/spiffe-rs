@@ -66,8 +66,8 @@ impl Bundle {
 
     /// Loads a JWT bundle from a JSON file (JWKS).
     pub fn load(trust_domain: TrustDomain, path: &str) -> Result<Bundle> {
-        let bytes =
-            fs::read(path).map_err(|err| wrap_error(format!("unable to read JWT bundle: {}", err)))?;
+        let bytes = fs::read(path)
+            .map_err(|err| wrap_error(format!("unable to read JWT bundle: {}", err)))?;
         Bundle::parse(trust_domain, &bytes)
     }
 
@@ -82,15 +82,15 @@ impl Bundle {
 
     /// Parses a JWT bundle from JSON bytes (JWKS).
     pub fn parse(trust_domain: TrustDomain, bytes: &[u8]) -> Result<Bundle> {
-        let jwks: JwkDocument =
-            serde_json::from_slice(bytes).map_err(|err| wrap_error(format!("unable to parse JWKS: {}", err)))?;
+        let jwks: JwkDocument = serde_json::from_slice(bytes)
+            .map_err(|err| wrap_error(format!("unable to parse JWKS: {}", err)))?;
         let bundle = Bundle::new(trust_domain);
         let keys = jwks.keys.unwrap_or_default();
         for (idx, key) in keys.iter().enumerate() {
             let key_id = key.key_id().unwrap_or_default();
-            let jwt_key = key
-                .to_jwt_key()
-                .map_err(|err| wrap_error(format!("error adding authority {} of JWKS: {}", idx, err)))?;
+            let jwt_key = key.to_jwt_key().map_err(|err| {
+                wrap_error(format!("error adding authority {} of JWKS: {}", idx, err))
+            })?;
             if let Err(err) = bundle.add_jwt_authority(key_id, jwt_key) {
                 return Err(wrap_error(format!(
                     "error adding authority {} of JWKS: {}",

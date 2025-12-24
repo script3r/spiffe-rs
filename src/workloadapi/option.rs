@@ -36,9 +36,7 @@ pub trait DialOption: Send + Sync {
 
 /// Sets the address of the Workload API endpoint.
 pub fn with_addr(addr: impl Into<String>) -> Arc<dyn ClientOption> {
-    Arc::new(WithAddr {
-        addr: addr.into(),
-    })
+    Arc::new(WithAddr { addr: addr.into() })
 }
 
 /// Sets the gRPC dial options.
@@ -57,23 +55,38 @@ pub fn with_backoff_strategy(strategy: Arc<dyn backoff::BackoffStrategy>) -> Arc
 }
 
 /// Sets an existing Workload API client to be used by the source.
+///
+/// Use this when you want to share a single [`Client`] across multiple sources
+/// (e.g. X.509 and JWT), or when you manage the client lifecycle yourself.
 pub fn with_client(client: Arc<Client>) -> Arc<dyn SourceOption> {
     Arc::new(WithClient { client })
 }
 
 /// Sets the options for the Workload API client created by the source.
+///
+/// This is used when the source is responsible for creating the underlying
+/// [`Client`]. If you already have a client instance, prefer [`with_client`].
 pub fn with_client_options(options: Vec<Arc<dyn ClientOption>>) -> Arc<dyn SourceOption> {
     Arc::new(WithClientOptions { options })
 }
 
 /// Sets a custom picker for X.509 SVIDs.
+///
+/// The Workload API may return multiple X.509-SVIDs. The picker decides which
+/// one is returned by higher-level helpers that need a single SVID (e.g.
+/// SPIFFE-TLS server configs).
 pub fn with_default_x509_svid_picker(
-    picker: Arc<dyn Fn(&[crate::svid::x509svid::SVID]) -> crate::svid::x509svid::SVID + Send + Sync>,
+    picker: Arc<
+        dyn Fn(&[crate::svid::x509svid::SVID]) -> crate::svid::x509svid::SVID + Send + Sync,
+    >,
 ) -> Arc<dyn X509SourceOption> {
     Arc::new(WithDefaultX509SVIDPicker { picker })
 }
 
 /// Sets a custom picker for JWT SVIDs.
+///
+/// The Workload API may return multiple JWT-SVIDs. The picker decides which one
+/// is returned by helpers that expect a single SVID.
 pub fn with_default_jwt_svid_picker(
     picker: Arc<dyn Fn(&[crate::svid::jwtsvid::SVID]) -> crate::svid::jwtsvid::SVID + Send + Sync>,
 ) -> Arc<dyn JWTSourceOption> {
@@ -131,8 +144,9 @@ impl Default for X509SourceConfig {
 
 pub struct JWTSourceConfig {
     pub watcher: WatcherConfig,
-    pub picker:
-        Option<Arc<dyn Fn(&[crate::svid::jwtsvid::SVID]) -> crate::svid::jwtsvid::SVID + Send + Sync>>,
+    pub picker: Option<
+        Arc<dyn Fn(&[crate::svid::jwtsvid::SVID]) -> crate::svid::jwtsvid::SVID + Send + Sync>,
+    >,
 }
 
 impl Default for JWTSourceConfig {
@@ -233,7 +247,8 @@ impl SourceOption for WithClientOptions {
 }
 
 struct WithDefaultX509SVIDPicker {
-    picker: Arc<dyn Fn(&[crate::svid::x509svid::SVID]) -> crate::svid::x509svid::SVID + Send + Sync>,
+    picker:
+        Arc<dyn Fn(&[crate::svid::x509svid::SVID]) -> crate::svid::x509svid::SVID + Send + Sync>,
 }
 
 impl X509SourceOption for WithDefaultX509SVIDPicker {

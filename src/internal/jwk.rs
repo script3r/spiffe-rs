@@ -39,10 +39,7 @@ impl JwkKeyEntry {
     pub fn to_jwt_key(&self) -> Result<JwtKey, String> {
         match self.kty.as_str() {
             "EC" => {
-                let crv = self
-                    .crv
-                    .as_ref()
-                    .ok_or_else(|| "missing crv".to_string())?;
+                let crv = self.crv.as_ref().ok_or_else(|| "missing crv".to_string())?;
                 let x = self
                     .x
                     .as_ref()

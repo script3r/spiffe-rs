@@ -81,7 +81,11 @@ impl X509Source {
         self.bundles
             .read()
             .ok()
-            .and_then(|guard| guard.as_ref().and_then(|b| b.get_x509_bundle_for_trust_domain(trust_domain).ok()))
+            .and_then(|guard| {
+                guard
+                    .as_ref()
+                    .and_then(|b| b.get_x509_bundle_for_trust_domain(trust_domain).ok())
+            })
             .ok_or_else(|| crate::workloadapi::Error::new("x509source: no X.509 bundle found"))
     }
 
@@ -97,7 +101,9 @@ impl X509Source {
 
     fn check_closed(&self) -> Result<()> {
         if self.closed.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err(crate::workloadapi::Error::new("x509source: source is closed"));
+            return Err(crate::workloadapi::Error::new(
+                "x509source: source is closed",
+            ));
         }
         Ok(())
     }

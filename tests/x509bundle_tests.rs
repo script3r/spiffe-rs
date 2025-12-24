@@ -81,7 +81,9 @@ fn bundle_get_for_trust_domain() {
     let td = require_trust_domain_from_string("domain.test");
     let td2 = require_trust_domain_from_string("domain2.test");
     let bundle = Bundle::new(td.clone());
-    let ok = bundle.get_x509_bundle_for_trust_domain(td.clone()).expect("bundle");
+    let ok = bundle
+        .get_x509_bundle_for_trust_domain(td.clone())
+        .expect("bundle");
     assert!(bundle.equal(&ok));
 
     let err = bundle

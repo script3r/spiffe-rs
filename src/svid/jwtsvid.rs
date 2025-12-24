@@ -3,16 +3,18 @@ use crate::bundle::jwtbundle::JwtKey;
 use crate::spiffeid::ID;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use base64::Engine;
-use p256::ecdsa::{signature::Verifier, Signature as P256Signature, VerifyingKey as P256VerifyingKey};
+use p256::ecdsa::{
+    signature::Verifier, Signature as P256Signature, VerifyingKey as P256VerifyingKey,
+};
 use p384::ecdsa::{Signature as P384Signature, VerifyingKey as P384VerifyingKey};
 use p521::ecdsa::{Signature as P521Signature, VerifyingKey as P521VerifyingKey};
+use pkcs8::AssociatedOid;
 use rsa::pkcs1v15::{Signature as RsaSignature, VerifyingKey as RsaVerifyingKey};
 use rsa::pss::{Signature as RsaPssSignature, VerifyingKey as RsaPssVerifyingKey};
+use rsa::signature::digest::FixedOutputReset;
 use rsa::RsaPublicKey;
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256, Sha384, Sha512};
-use pkcs8::AssociatedOid;
-use rsa::signature::digest::FixedOutputReset;
 use std::collections::HashMap;
 use std::time::{Duration, SystemTime};
 
@@ -103,29 +105,34 @@ pub fn parse_and_validate(
     bundles: &dyn jwtbundle::Source,
     audience: &[String],
 ) -> Result<SVID> {
-    parse(token, audience, |header, signing_input, signature, trust_domain| {
-        let key_id = header
-            .kid
-            .as_deref()
-            .ok_or_else(|| wrap_error("token header missing key id"))?;
-        let bundle = bundles
-            .get_jwt_bundle_for_trust_domain(trust_domain.clone())
-            .map_err(|_| {
-            wrap_error(format!("no bundle found for trust domain \"{}\"", trust_domain))
-        })?;
-        let authority = bundle
-            .find_jwt_authority(key_id)
-            .ok_or_else(|| {
+    parse(
+        token,
+        audience,
+        |header, signing_input, signature, trust_domain| {
+            let key_id = header
+                .kid
+                .as_deref()
+                .ok_or_else(|| wrap_error("token header missing key id"))?;
+            let bundle = bundles
+                .get_jwt_bundle_for_trust_domain(trust_domain.clone())
+                .map_err(|_| {
+                    wrap_error(format!(
+                        "no bundle found for trust domain \"{}\"",
+                        trust_domain
+                    ))
+                })?;
+            let authority = bundle.find_jwt_authority(key_id).ok_or_else(|| {
                 wrap_error(format!(
                     "no JWT authority \"{}\" found for trust domain \"{}\"",
                     key_id, trust_domain
                 ))
             })?;
-        verify_signature(&header.alg, &authority, signing_input, signature).map_err(|_| {
+            verify_signature(&header.alg, &authority, signing_input, signature).map_err(|_| {
             wrap_error("unable to get claims from token: go-jose/go-jose: error in cryptographic primitive")
         })?;
-        Ok(())
-    })
+            Ok(())
+        },
+    )
 }
 
 /// Parses a JWT SVID token without validating its signature.
@@ -133,7 +140,11 @@ pub fn parse_and_validate(
 /// **WARNING**: This should only be used if the token has already been validated
 /// by other means.
 pub fn parse_insecure(token: &str, audience: &[String]) -> Result<SVID> {
-    parse(token, audience, |_header, _signing_input, _signature, _td| Ok(()))
+    parse(
+        token,
+        audience,
+        |_header, _signing_input, _signature, _td| Ok(()),
+    )
 }
 
 fn parse<F>(token: &str, audience: &[String], verify: F) -> Result<SVID>
@@ -154,20 +165,22 @@ where
         .decode(parts[2].as_bytes())
         .map_err(|_| wrap_error("unable to parse JWT token"))?;
 
-    let header: Header =
-        serde_json::from_slice(&header_bytes).map_err(|_| wrap_error("unable to parse JWT token"))?;
+    let header: Header = serde_json::from_slice(&header_bytes)
+        .map_err(|_| wrap_error("unable to parse JWT token"))?;
 
     if !is_allowed_alg(&header.alg) {
         return Err(wrap_error("unable to parse JWT token"));
     }
     if let Some(typ) = header.typ.as_deref() {
         if typ != "JWT" && typ != "JOSE" {
-            return Err(wrap_error("token header type not equal to either JWT or JOSE"));
+            return Err(wrap_error(
+                "token header type not equal to either JWT or JOSE",
+            ));
         }
     }
 
-    let claims: Map<String, Value> =
-        serde_json::from_slice(&payload_bytes).map_err(|_| wrap_error("unable to parse JWT token"))?;
+    let claims: Map<String, Value> = serde_json::from_slice(&payload_bytes)
+        .map_err(|_| wrap_error("unable to parse JWT token"))?;
     let subject = claims
         .get("sub")
         .and_then(|v| v.as_str())
@@ -182,7 +195,12 @@ where
         .map_err(|err| wrap_error(format!("token has an invalid subject claim: {}", err)))?;
 
     let trust_domain = id.trust_domain();
-    verify(&header, &format!("{}.{}", parts[0], parts[1]), &signature, &trust_domain)?;
+    verify(
+        &header,
+        &format!("{}.{}", parts[0], parts[1]),
+        &signature,
+        &trust_domain,
+    )?;
 
     validate_claims(expiry, &aud, audience)?;
 
@@ -233,9 +251,15 @@ fn is_allowed_alg(alg: &str) -> bool {
 
 fn verify_signature(alg: &str, key: &JwtKey, signing_input: &str, signature: &[u8]) -> Result<()> {
     match (alg, key) {
-        ("RS256", JwtKey::Rsa { n, e }) => verify_rsa_pkcs1::<Sha256>(n, e, signing_input, signature),
-        ("RS384", JwtKey::Rsa { n, e }) => verify_rsa_pkcs1::<Sha384>(n, e, signing_input, signature),
-        ("RS512", JwtKey::Rsa { n, e }) => verify_rsa_pkcs1::<Sha512>(n, e, signing_input, signature),
+        ("RS256", JwtKey::Rsa { n, e }) => {
+            verify_rsa_pkcs1::<Sha256>(n, e, signing_input, signature)
+        }
+        ("RS384", JwtKey::Rsa { n, e }) => {
+            verify_rsa_pkcs1::<Sha384>(n, e, signing_input, signature)
+        }
+        ("RS512", JwtKey::Rsa { n, e }) => {
+            verify_rsa_pkcs1::<Sha512>(n, e, signing_input, signature)
+        }
         ("PS256", JwtKey::Rsa { n, e }) => verify_rsa_pss::<Sha256>(n, e, signing_input, signature),
         ("PS384", JwtKey::Rsa { n, e }) => verify_rsa_pss::<Sha384>(n, e, signing_input, signature),
         ("PS512", JwtKey::Rsa { n, e }) => verify_rsa_pss::<Sha512>(n, e, signing_input, signature),
@@ -246,12 +270,7 @@ fn verify_signature(alg: &str, key: &JwtKey, signing_input: &str, signature: &[u
     }
 }
 
-fn verify_rsa_pkcs1<D>(
-    n: &[u8],
-    e: &[u8],
-    signing_input: &str,
-    signature: &[u8],
-) -> Result<()>
+fn verify_rsa_pkcs1<D>(n: &[u8], e: &[u8], signing_input: &str, signature: &[u8]) -> Result<()>
 where
     D: Digest + AssociatedOid,
 {
@@ -264,12 +283,7 @@ where
     Ok(())
 }
 
-fn verify_rsa_pss<D>(
-    n: &[u8],
-    e: &[u8],
-    signing_input: &str,
-    signature: &[u8],
-) -> Result<()>
+fn verify_rsa_pss<D>(n: &[u8], e: &[u8], signing_input: &str, signature: &[u8]) -> Result<()>
 where
     D: Digest + FixedOutputReset,
 {
@@ -288,45 +302,30 @@ fn rsa_public_key(n: &[u8], e: &[u8]) -> Result<RsaPublicKey> {
     RsaPublicKey::new(n, e).map_err(|_| wrap_error("invalid RSA key"))
 }
 
-fn verify_ecdsa_p256(
-    x: &[u8],
-    y: &[u8],
-    signing_input: &str,
-    signature: &[u8],
-) -> Result<()> {
+fn verify_ecdsa_p256(x: &[u8], y: &[u8], signing_input: &str, signature: &[u8]) -> Result<()> {
     let public_key = ecdsa_public_key(x, y)?;
-    let key = P256VerifyingKey::from_sec1_bytes(&public_key)
-        .map_err(|_| wrap_error("invalid EC key"))?;
+    let key =
+        P256VerifyingKey::from_sec1_bytes(&public_key).map_err(|_| wrap_error("invalid EC key"))?;
     let sig = P256Signature::from_slice(signature).map_err(|_| wrap_error("invalid signature"))?;
     key.verify(signing_input.as_bytes(), &sig)
         .map_err(|_| wrap_error("invalid signature"))?;
     Ok(())
 }
 
-fn verify_ecdsa_p384(
-    x: &[u8],
-    y: &[u8],
-    signing_input: &str,
-    signature: &[u8],
-) -> Result<()> {
+fn verify_ecdsa_p384(x: &[u8], y: &[u8], signing_input: &str, signature: &[u8]) -> Result<()> {
     let public_key = ecdsa_public_key(x, y)?;
-    let key = P384VerifyingKey::from_sec1_bytes(&public_key)
-        .map_err(|_| wrap_error("invalid EC key"))?;
+    let key =
+        P384VerifyingKey::from_sec1_bytes(&public_key).map_err(|_| wrap_error("invalid EC key"))?;
     let sig = P384Signature::from_slice(signature).map_err(|_| wrap_error("invalid signature"))?;
     key.verify(signing_input.as_bytes(), &sig)
         .map_err(|_| wrap_error("invalid signature"))?;
     Ok(())
 }
 
-fn verify_ecdsa_p521(
-    x: &[u8],
-    y: &[u8],
-    signing_input: &str,
-    signature: &[u8],
-) -> Result<()> {
+fn verify_ecdsa_p521(x: &[u8], y: &[u8], signing_input: &str, signature: &[u8]) -> Result<()> {
     let public_key = ecdsa_public_key(x, y)?;
-    let key = P521VerifyingKey::from_sec1_bytes(&public_key)
-        .map_err(|_| wrap_error("invalid EC key"))?;
+    let key =
+        P521VerifyingKey::from_sec1_bytes(&public_key).map_err(|_| wrap_error("invalid EC key"))?;
     let sig = P521Signature::from_slice(signature).map_err(|_| wrap_error("invalid signature"))?;
     key.verify(signing_input.as_bytes(), &sig)
         .map_err(|_| wrap_error("invalid signature"))?;

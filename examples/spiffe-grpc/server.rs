@@ -1,16 +1,16 @@
 use spiffe_rs::spiffeid;
 use spiffe_rs::spiffetls;
 use spiffe_rs::workloadapi;
+use std::pin::Pin;
 use std::sync::Arc;
-use tokio::net::TcpListener;
+use std::task::{Context, Poll};
 use tokio::io::{AsyncRead, AsyncWrite, ReadBuf};
+use tokio::net::TcpListener;
 use tokio_rustls::TlsAcceptor;
 use tokio_stream::wrappers::ReceiverStream;
+use tonic::transport::server::Connected;
 use tonic::transport::Server;
 use tonic::{Request, Response, Status};
-use tonic::transport::server::Connected;
-use std::pin::Pin;
-use std::task::{Context, Poll};
 
 pub mod helloworld {
     tonic::include_proto!("helloworld");
@@ -24,7 +24,10 @@ struct GreeterService;
 
 #[tonic::async_trait]
 impl Greeter for GreeterService {
-    async fn say_hello(&self, request: Request<HelloRequest>) -> Result<Response<HelloReply>, Status> {
+    async fn say_hello(
+        &self,
+        request: Request<HelloRequest>,
+    ) -> Result<Response<HelloReply>, Status> {
         let name = request.into_inner().name;
         let reply = HelloReply {
             message: format!("Hello {}", name),
@@ -41,7 +44,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let source = Arc::new(workloadapi::X509Source::new(&ctx, Vec::new()).await?);
     let client_id = spiffeid::require_from_string("spiffe://example.org/client");
     let authorizer = spiffetls::tlsconfig::authorize_id(client_id);
-    let mut tls_config = spiffetls::tlsconfig::mtls_server_config(source.as_ref(), source.clone(), authorizer)?;
+    let mut tls_config =
+        spiffetls::tlsconfig::mtls_server_config(source.as_ref(), source.clone(), authorizer)?;
     tls_config.alpn_protocols = vec![b"h2".to_vec()];
     let acceptor = TlsAcceptor::from(Arc::new(tls_config));
 
@@ -110,17 +114,11 @@ impl AsyncWrite for TlsIo {
         Pin::new(&mut self.0).poll_write(cx, data)
     }
 
-    fn poll_flush(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<std::io::Result<()>> {
+    fn poll_flush(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         Pin::new(&mut self.0).poll_flush(cx)
     }
 
-    fn poll_shutdown(
-        mut self: Pin<&mut Self>,
-        cx: &mut Context<'_>,
-    ) -> Poll<std::io::Result<()>> {
+    fn poll_shutdown(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<std::io::Result<()>> {
         Pin::new(&mut self.0).poll_shutdown(cx)
     }
 }

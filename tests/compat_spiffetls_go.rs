@@ -17,13 +17,15 @@ async fn spiffetls_accepts_go_svid_tls_server() {
         return;
     }
 
-    let temp_dir = std::env::temp_dir()
-        .join(format!("spiffe_rs_tls_{}_{}", std::process::id(), chrono_stamp()));
+    let temp_dir = std::env::temp_dir().join(format!(
+        "spiffe_rs_tls_{}_{}",
+        std::process::id(),
+        chrono_stamp()
+    ));
     fs::create_dir_all(&temp_dir).expect("create temp dir");
 
     let ca_path = temp_dir.join("ca.pem");
-    fs::write(temp_dir.join("go.mod"), "module compat\n\ngo 1.20\n")
-        .expect("write go.mod");
+    fs::write(temp_dir.join("go.mod"), "module compat\n\ngo 1.20\n").expect("write go.mod");
 
     let main = format!(
         r#"
@@ -140,9 +142,9 @@ func main() {{
     }
 
     let bundle = load_ca_bundle(&ca_path);
-    let authorizer = spiffetls::tlsconfig::authorize_id(
-        spiffeid::require_from_string("spiffe://example.org/workload-1"),
-    );
+    let authorizer = spiffetls::tlsconfig::authorize_id(spiffeid::require_from_string(
+        "spiffe://example.org/workload-1",
+    ));
     let ctx = workloadapi::background();
     let server_name = rustls::ServerName::try_from("example.org").expect("server name");
     let mode = spiffetls::tls_client_with_raw_config(authorizer, Arc::new(bundle));
@@ -168,8 +170,8 @@ fn load_ca_bundle(path: &Path) -> x509bundle::Bundle {
         if pem.tag() != "CERTIFICATE" {
             continue;
         }
-        let (_rest, cert) = x509_parser::parse_x509_certificate(pem.contents())
-            .expect("parse cert");
+        let (_rest, cert) =
+            x509_parser::parse_x509_certificate(pem.contents()).expect("parse cert");
         if cert.is_ca() {
             bundle.add_x509_authority(pem.contents());
         }

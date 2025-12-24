@@ -1,10 +1,19 @@
-use crate::workloadapi::{JWTBundleWatcher, Result, X509Context, X509ContextWatcher};
 use crate::workloadapi::{option::WatcherConfig, Client, Context};
+use crate::workloadapi::{JWTBundleWatcher, Result, X509Context, X509ContextWatcher};
 use std::sync::{Arc, Mutex};
 use tokio::sync::{oneshot, watch};
 use tokio::task::JoinHandle;
 use tokio_util::sync::CancellationToken;
 
+/// High-level helper that spawns Workload API watch tasks and exposes an
+/// "updated" signal.
+///
+/// A `Watcher` can:
+/// - create or reuse a [`Client`]
+/// - spawn background tasks that watch X.509 contexts and/or JWT bundles
+/// - provide a [`watch::Receiver`] that ticks whenever an update is observed
+///
+/// Call [`Watcher::close`] to stop the background tasks.
 pub struct Watcher {
     updated_tx: watch::Sender<u64>,
     updated_rx: watch::Receiver<u64>,
@@ -15,6 +24,13 @@ pub struct Watcher {
 }
 
 impl Watcher {
+    /// Creates a watcher and starts watch tasks immediately.
+    ///
+    /// - If `config.client` is `None`, a new Workload API [`Client`] is created
+    ///   using `config.client_options`.
+    /// - If a handler is `Some`, the corresponding watch task is spawned.
+    /// - This method waits for each spawned watch to deliver its first update
+    ///   before returning successfully.
     pub async fn new(
         ctx: &Context,
         config: WatcherConfig,
@@ -43,6 +59,7 @@ impl Watcher {
         Ok(watcher)
     }
 
+    /// Cancels all watch tasks and (if owned) closes the underlying client.
     pub async fn close(&self) -> Result<()> {
         self.cancel.cancel();
         if let Ok(mut tasks) = self.tasks.lock() {
@@ -56,6 +73,10 @@ impl Watcher {
         Ok(())
     }
 
+    /// Waits until at least one update is observed.
+    ///
+    /// This returns after the internal `updated` counter changes. If you need a
+    /// stream of updates, use [`Watcher::updated`].
     pub async fn wait_until_updated(&self, ctx: &Context) -> Result<()> {
         let mut rx = self.updated_rx.clone();
         tokio::select! {
@@ -64,10 +85,13 @@ impl Watcher {
         }
     }
 
+    /// Returns a receiver that increments on each observed update.
+    ///
+    /// Consumers can call `changed().await` or read the counter value to detect
+    /// updates.
     pub fn updated(&self) -> watch::Receiver<u64> {
         self.updated_rx.clone()
     }
-
 
     async fn spawn_watchers(
         &self,

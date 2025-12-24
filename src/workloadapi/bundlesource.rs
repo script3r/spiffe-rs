@@ -47,7 +47,8 @@ impl BundleSource {
             }
         });
 
-        let watcher = Watcher::new(ctx, config.watcher, Some(x509_handler), Some(jwt_handler)).await?;
+        let watcher =
+            Watcher::new(ctx, config.watcher, Some(x509_handler), Some(jwt_handler)).await?;
         Ok(BundleSource {
             watcher,
             x509_authorities,
@@ -61,7 +62,10 @@ impl BundleSource {
         self.watcher.close().await
     }
 
-    pub fn get_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<spiffebundle::Bundle> {
+    pub fn get_bundle_for_trust_domain(
+        &self,
+        trust_domain: TrustDomain,
+    ) -> Result<spiffebundle::Bundle> {
         self.check_closed()?;
         let x509 = self
             .x509_authorities
@@ -90,7 +94,10 @@ impl BundleSource {
         Ok(bundle)
     }
 
-    pub fn get_x509_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<x509bundle::Bundle> {
+    pub fn get_x509_bundle_for_trust_domain(
+        &self,
+        trust_domain: TrustDomain,
+    ) -> Result<x509bundle::Bundle> {
         self.check_closed()?;
         let x509 = self
             .x509_authorities
@@ -103,10 +110,16 @@ impl BundleSource {
                     trust_domain
                 ))
             })?;
-        Ok(x509bundle::Bundle::from_x509_authorities(trust_domain, &x509))
+        Ok(x509bundle::Bundle::from_x509_authorities(
+            trust_domain,
+            &x509,
+        ))
     }
 
-    pub fn get_jwt_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<jwtbundle::Bundle> {
+    pub fn get_jwt_bundle_for_trust_domain(
+        &self,
+        trust_domain: TrustDomain,
+    ) -> Result<jwtbundle::Bundle> {
         self.check_closed()?;
         let jwt = self
             .jwt_authorities
@@ -132,28 +145,39 @@ impl BundleSource {
 
     fn check_closed(&self) -> Result<()> {
         if self.closed.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err(crate::workloadapi::Error::new("bundlesource: source is closed"));
+            return Err(crate::workloadapi::Error::new(
+                "bundlesource: source is closed",
+            ));
         }
         Ok(())
     }
 }
 
 impl spiffebundle::Source for BundleSource {
-    fn get_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> spiffebundle::Result<spiffebundle::Bundle> {
+    fn get_bundle_for_trust_domain(
+        &self,
+        trust_domain: TrustDomain,
+    ) -> spiffebundle::Result<spiffebundle::Bundle> {
         self.get_bundle_for_trust_domain(trust_domain)
             .map_err(|err| spiffebundle::Error::new(err.to_string()))
     }
 }
 
 impl x509bundle::Source for BundleSource {
-    fn get_x509_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> x509bundle::Result<x509bundle::Bundle> {
+    fn get_x509_bundle_for_trust_domain(
+        &self,
+        trust_domain: TrustDomain,
+    ) -> x509bundle::Result<x509bundle::Bundle> {
         self.get_x509_bundle_for_trust_domain(trust_domain)
             .map_err(|err| x509bundle::Error::new(err.to_string()))
     }
 }
 
 impl jwtbundle::Source for BundleSource {
-    fn get_jwt_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> jwtbundle::Result<jwtbundle::Bundle> {
+    fn get_jwt_bundle_for_trust_domain(
+        &self,
+        trust_domain: TrustDomain,
+    ) -> jwtbundle::Result<jwtbundle::Bundle> {
         self.get_jwt_bundle_for_trust_domain(trust_domain)
             .map_err(|err| jwtbundle::Error::new(err.to_string()))
     }

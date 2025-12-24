@@ -1,7 +1,7 @@
 use spiffe_rs::bundle::jwtbundle;
+use spiffe_rs::bundle::spiffebundle::JwtKey;
 use spiffe_rs::bundle::spiffebundle::{Bundle, Set};
 use spiffe_rs::bundle::x509bundle;
-use spiffe_rs::bundle::spiffebundle::JwtKey;
 use spiffe_rs::spiffeid::require_trust_domain_from_string;
 use std::fs;
 use std::time::Duration;
@@ -56,8 +56,11 @@ fn bundle_refresh_hint_and_sequence() {
 #[test]
 fn bundle_marshal_roundtrip() {
     let td = require_trust_domain_from_string("domain.test");
-    let bundle = Bundle::load(td.clone(), "tests/testdata/spiffebundle/spiffebundle_valid_2.json")
-        .expect("load");
+    let bundle = Bundle::load(
+        td.clone(),
+        "tests/testdata/spiffebundle/spiffebundle_valid_2.json",
+    )
+    .expect("load");
     let bytes = bundle.marshal().expect("marshal");
     let parsed = Bundle::parse(td, &bytes).expect("parse");
     assert!(bundle.equal(&parsed));
@@ -66,11 +69,14 @@ fn bundle_marshal_roundtrip() {
 #[test]
 fn bundle_x509_and_jwt_views() {
     let td = require_trust_domain_from_string("domain.test");
-    let x509_bundle = x509bundle::Bundle::load(td.clone(), "tests/testdata/x509bundle/cert.pem").expect("load");
+    let x509_bundle =
+        x509bundle::Bundle::load(td.clone(), "tests/testdata/x509bundle/cert.pem").expect("load");
     let bundle = Bundle::from_x509_bundle(&x509_bundle);
     assert_eq!(bundle.x509_authorities().len(), 1);
 
-    let jwt_bundle = jwtbundle::Bundle::load(td.clone(), "tests/testdata/jwtbundle/jwks_valid_1.json").expect("load");
+    let jwt_bundle =
+        jwtbundle::Bundle::load(td.clone(), "tests/testdata/jwtbundle/jwks_valid_1.json")
+            .expect("load");
     let bundle = Bundle::from_jwt_bundle(&jwt_bundle);
     assert_eq!(bundle.jwt_authorities().len(), 1);
 }
@@ -104,14 +110,19 @@ fn bundle_get_for_trust_domain() {
     let td = require_trust_domain_from_string("domain.test");
     let td2 = require_trust_domain_from_string("domain2.test");
     let bundle = Bundle::new(td.clone());
-    let ok = bundle.get_bundle_for_trust_domain(td.clone()).expect("bundle");
+    let ok = bundle
+        .get_bundle_for_trust_domain(td.clone())
+        .expect("bundle");
     assert!(bundle.equal(&ok));
 
     let err = bundle
         .get_bundle_for_trust_domain(td2)
         .unwrap_err()
         .to_string();
-    assert_eq!(err, "spiffebundle: no SPIFFE bundle for trust domain \"domain2.test\"");
+    assert_eq!(
+        err,
+        "spiffebundle: no SPIFFE bundle for trust domain \"domain2.test\""
+    );
 }
 
 #[test]
@@ -132,5 +143,8 @@ fn set_ops() {
         .get_bundle_for_trust_domain(require_trust_domain_from_string("missing.test"))
         .unwrap_err()
         .to_string();
-    assert_eq!(err, "spiffebundle: no SPIFFE bundle for trust domain \"missing.test\"");
+    assert_eq!(
+        err,
+        "spiffebundle: no SPIFFE bundle for trust domain \"missing.test\""
+    );
 }

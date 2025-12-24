@@ -283,8 +283,8 @@ fn parse_raw_certificates(bytes: &[u8]) -> std::result::Result<Vec<Vec<u8>>, Str
     let mut remaining = bytes;
     let mut certs = Vec::new();
     while !remaining.is_empty() {
-        let (rest, _cert) = x509_parser::parse_x509_certificate(remaining)
-            .map_err(|err| err.to_string())?;
+        let (rest, _cert) =
+            x509_parser::parse_x509_certificate(remaining).map_err(|err| err.to_string())?;
         let consumed = remaining
             .len()
             .checked_sub(rest.len())

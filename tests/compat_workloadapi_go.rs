@@ -18,8 +18,11 @@ async fn workloadapi_fetches_from_go_server() {
         return;
     }
 
-    let temp_dir = std::env::temp_dir()
-        .join(format!("spiffe_rs_wl_{}_{}", std::process::id(), chrono_stamp()));
+    let temp_dir = std::env::temp_dir().join(format!(
+        "spiffe_rs_wl_{}_{}",
+        std::process::id(),
+        chrono_stamp()
+    ));
     fs::create_dir_all(&temp_dir).expect("create temp dir");
 
     let go_mod = format!(
@@ -151,9 +154,14 @@ func main() {{
     let svid = client.fetch_x509_svid(&ctx).await.expect("fetch svid");
     assert_eq!(svid.id.to_string(), "spiffe://example.org/workload-1");
 
-    let bundles = client.fetch_x509_bundles(&ctx).await.expect("fetch bundles");
+    let bundles = client
+        .fetch_x509_bundles(&ctx)
+        .await
+        .expect("fetch bundles");
     let td = spiffeid::require_trust_domain_from_string("example.org");
-    let bundle = bundles.get_x509_bundle_for_trust_domain(td).expect("bundle");
+    let bundle = bundles
+        .get_x509_bundle_for_trust_domain(td)
+        .expect("bundle");
     assert!(!bundle.x509_authorities().is_empty());
 
     let _ = child.kill();

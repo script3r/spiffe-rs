@@ -36,7 +36,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     return;
                 }
             };
-            let service = service_fn(move |req| handle_request(req, jwt_source.clone(), audience.clone()));
+            let service =
+                service_fn(move |req| handle_request(req, jwt_source.clone(), audience.clone()));
             if let Err(err) = hyper::server::conn::Http::new()
                 .serve_connection(tls, service)
                 .await

@@ -30,8 +30,8 @@ fn start_test_server(body: Vec<u8>) -> (String, thread::JoinHandle<()>) {
 #[test]
 fn fetch_bundle_over_http() {
     let trust_domain = spiffeid::require_trust_domain_from_string("domain.test");
-    let body =
-        fs::read("tests/testdata/spiffebundle/spiffebundle_valid_1.json").expect("read test bundle");
+    let body = fs::read("tests/testdata/spiffebundle/spiffebundle_valid_1.json")
+        .expect("read test bundle");
     let expected = spiffebundle::Bundle::parse(trust_domain.clone(), &body).expect("parse bundle");
     let (url, handle) = start_test_server(body);
 
@@ -48,7 +48,9 @@ fn fetch_bundle_option_conflict() {
     let bundle_source = Arc::new(x509bundle::Bundle::from_x509_authorities(trust_domain, &[]));
     let options: Vec<Box<dyn federation::FetchOption>> = vec![
         Box::new(federation::with_spiffe_auth(bundle_source, id)),
-        Box::new(federation::with_web_pki_roots(rustls::RootCertStore::empty())),
+        Box::new(federation::with_web_pki_roots(
+            rustls::RootCertStore::empty(),
+        )),
     ];
 
     let err = federation::fetch_bundle(

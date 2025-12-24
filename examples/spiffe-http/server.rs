@@ -15,7 +15,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let source = Arc::new(workloadapi::X509Source::new(&ctx, Vec::new()).await?);
     let client_id = spiffeid::require_from_string("spiffe://example.org/client");
     let authorizer = spiffetls::tlsconfig::authorize_id(client_id);
-    let tls_config = spiffetls::tlsconfig::mtls_server_config(source.as_ref(), source.clone(), authorizer)?;
+    let tls_config =
+        spiffetls::tlsconfig::mtls_server_config(source.as_ref(), source.clone(), authorizer)?;
     let acceptor = TlsAcceptor::from(Arc::new(tls_config));
 
     let listener = TcpListener::bind("127.0.0.1:8443").await?;

@@ -7,7 +7,7 @@ mod require;
 mod trustdomain;
 
 pub use errors::{Error, Result};
-pub use id::{ID, SpiffeUrl};
+pub use id::{SpiffeUrl, ID};
 pub use matcher::{match_any, match_id, match_member_of, match_one_of, Matcher, MatcherError};
 pub use path::{format_path, join_path_segments, validate_path, validate_path_segment};
 pub use require::{

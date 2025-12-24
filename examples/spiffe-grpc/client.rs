@@ -1,9 +1,9 @@
+use hyper::Uri;
 use spiffe_rs::spiffeid;
 use spiffe_rs::spiffetls;
 use spiffe_rs::workloadapi;
-use std::sync::Arc;
-use hyper::Uri;
 use std::io;
+use std::sync::Arc;
 use tokio::net::TcpStream;
 use tokio_rustls::TlsConnector;
 use tonic::transport::{Channel, Endpoint};
@@ -24,7 +24,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let source = Arc::new(workloadapi::X509Source::new(&ctx, Vec::new()).await?);
     let server_id = spiffeid::require_from_string("spiffe://example.org/server");
     let authorizer = spiffetls::tlsconfig::authorize_id(server_id);
-    let mut tls_config = spiffetls::tlsconfig::mtls_client_config(source.as_ref(), source.clone(), authorizer)?;
+    let mut tls_config =
+        spiffetls::tlsconfig::mtls_client_config(source.as_ref(), source.clone(), authorizer)?;
     tls_config.alpn_protocols = vec![b"h2".to_vec()];
     let connector = TlsConnector::from(Arc::new(tls_config));
 
@@ -33,16 +34,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .connect_with_connector(service_fn(move |uri: Uri| {
             let connector = connector.clone();
             async move {
-                let authority = uri
-                    .authority()
-                    .map(|auth| auth.as_str())
-                    .ok_or_else(|| io::Error::new(io::ErrorKind::InvalidInput, "missing authority"))?;
+                let authority = uri.authority().map(|auth| auth.as_str()).ok_or_else(|| {
+                    io::Error::new(io::ErrorKind::InvalidInput, "missing authority")
+                })?;
                 let stream = TcpStream::connect(authority).await?;
                 let server_name = rustls::ServerName::try_from("example.org")
                     .map_err(|err| io::Error::new(io::ErrorKind::InvalidInput, err))?;
-                connector.connect(server_name, stream).await.map_err(|err| {
-                    io::Error::new(io::ErrorKind::Other, err)
-                })
+                connector
+                    .connect(server_name, stream)
+                    .await
+                    .map_err(|err| io::Error::new(io::ErrorKind::Other, err))
             }
         }))
         .await?;

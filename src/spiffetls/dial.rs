@@ -52,7 +52,14 @@ pub async fn dial(
     authorizer: tlsconfig::Authorizer,
     options: Vec<Box<dyn DialOption>>,
 ) -> Result<ClientStream> {
-    dial_with_mode(ctx, addr, server_name, crate::spiffetls::mtls_client(authorizer), options).await
+    dial_with_mode(
+        ctx,
+        addr,
+        server_name,
+        crate::spiffetls::mtls_client(authorizer),
+        options,
+    )
+    .await
 }
 
 /// Dials a SPIFFE-TLS server with the given mode.
@@ -85,12 +92,18 @@ pub async fn dial_with_mode(
 
     let tls_config = match m.mode {
         crate::spiffetls::mode::ClientMode::Tls => {
-            let bundle = m.bundle.ok_or_else(|| crate::spiffetls::wrap_error("missing bundle source"))?;
+            let bundle = m
+                .bundle
+                .ok_or_else(|| crate::spiffetls::wrap_error("missing bundle source"))?;
             tlsconfig::tls_client_config(bundle, m.authorizer.clone())?
         }
         crate::spiffetls::mode::ClientMode::Mtls => {
-            let svid = m.svid.ok_or_else(|| crate::spiffetls::wrap_error("missing svid source"))?;
-            let bundle = m.bundle.ok_or_else(|| crate::spiffetls::wrap_error("missing bundle source"))?;
+            let svid = m
+                .svid
+                .ok_or_else(|| crate::spiffetls::wrap_error("missing svid source"))?;
+            let bundle = m
+                .bundle
+                .ok_or_else(|| crate::spiffetls::wrap_error("missing bundle source"))?;
             tlsconfig::mtls_client_config_with_options(
                 svid.as_ref(),
                 bundle,
@@ -99,7 +112,9 @@ pub async fn dial_with_mode(
             )?
         }
         crate::spiffetls::mode::ClientMode::MtlsWeb => {
-            let svid = m.svid.ok_or_else(|| crate::spiffetls::wrap_error("missing svid source"))?;
+            let svid = m
+                .svid
+                .ok_or_else(|| crate::spiffetls::wrap_error("missing svid source"))?;
             tlsconfig::mtls_web_client_config_with_options(
                 svid.as_ref(),
                 m.roots,
@@ -110,8 +125,9 @@ pub async fn dial_with_mode(
 
     let tcp = TcpStream::connect(addr).map_err(|err| crate::spiffetls::wrap_error(err))?;
     let tls_config = apply_base_client_config(tls_config, config.base_client_config);
-    let conn = rustls::ClientConnection::new(Arc::new(tls_config), server_name)
-        .map_err(|err| crate::spiffetls::wrap_error(format!("unable to create client connection: {}", err)))?;
+    let conn = rustls::ClientConnection::new(Arc::new(tls_config), server_name).map_err(|err| {
+        crate::spiffetls::wrap_error(format!("unable to create client connection: {}", err))
+    })?;
     Ok(ClientStream {
         inner: rustls::StreamOwned::new(conn, tcp),
         source,
@@ -139,8 +155,9 @@ fn peer_id_from_certs(certs: Option<&[rustls::Certificate]>) -> Result<ID> {
     let cert = certs
         .first()
         .ok_or_else(|| crate::spiffetls::wrap_error("no peer certificates"))?;
-    let (_rest, parsed) = x509_parser::parse_x509_certificate(&cert.0)
-        .map_err(|err| crate::spiffetls::wrap_error(format!("invalid peer certificate: {}", err)))?;
+    let (_rest, parsed) = x509_parser::parse_x509_certificate(&cert.0).map_err(|err| {
+        crate::spiffetls::wrap_error(format!("invalid peer certificate: {}", err))
+    })?;
     let san = parsed
         .subject_alternative_name()
         .map_err(|_| crate::spiffetls::wrap_error("invalid peer certificate: invalid URI SAN"))?
