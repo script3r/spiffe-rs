@@ -1,13 +1,13 @@
+use base64::Engine;
 use rand::rngs::OsRng;
 use rsa::pkcs1v15::SigningKey as RsaSigningKey;
+use rsa::signature::{SignatureEncoding, Signer};
+use rsa::traits::PublicKeyParts;
 use rsa::RsaPrivateKey;
 use sha2::Sha256;
-use rsa::signature::{Signer, SignatureEncoding};
-use rsa::traits::PublicKeyParts;
-use base64::Engine;
 use spiffe_rs::bundle::jwtbundle::{Bundle, JwtKey};
-use spiffe_rs::svid::jwtsvid;
 use spiffe_rs::spiffeid::require_trust_domain_from_string;
+use spiffe_rs::svid::jwtsvid;
 use std::time::{Duration, SystemTime};
 
 fn generate_rsa_key() -> RsaPrivateKey {
@@ -32,12 +32,10 @@ fn build_jwt(
     if let Some(typ) = typ {
         header["typ"] = serde_json::Value::String(typ.to_string());
     }
-    let header_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(
-        serde_json::to_vec(&header).expect("header json"),
-    );
-    let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(
-        serde_json::to_vec(&claims).expect("claims json"),
-    );
+    let header_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(serde_json::to_vec(&header).expect("header json"));
+    let payload_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD
+        .encode(serde_json::to_vec(&claims).expect("claims json"));
     let signing_input = format!("{}.{}", header_b64, payload_b64);
     let signature = signer.sign(signing_input.as_bytes(), alg);
     let sig_b64 = base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(signature);
@@ -112,9 +110,15 @@ fn parse_and_validate_success() {
         "exp": exp_secs,
         "iat": exp_secs - 10,
     });
-    let token = build_jwt("ES384", Some("authority1"), None, claims, &SignerKey::P384(p384_key));
-    let svid = jwtsvid::parse_and_validate(&token, &bundle, &["audience".to_string()])
-        .expect("parse");
+    let token = build_jwt(
+        "ES384",
+        Some("authority1"),
+        None,
+        claims,
+        &SignerKey::P384(p384_key),
+    );
+    let svid =
+        jwtsvid::parse_and_validate(&token, &bundle, &["audience".to_string()]).expect("parse");
     assert_eq!(svid.id.to_string(), "spiffe://trustdomain/host");
 }
 
@@ -175,7 +179,13 @@ fn parse_insecure_success() {
         "aud": ["audience"],
         "exp": exp_secs,
     });
-    let token = build_jwt("ES384", Some("key1"), None, claims, &SignerKey::P384(p384_key));
+    let token = build_jwt(
+        "ES384",
+        Some("key1"),
+        None,
+        claims,
+        &SignerKey::P384(p384_key),
+    );
     let svid = jwtsvid::parse_insecure(&token, &["audience".to_string()]).expect("parse");
     assert_eq!(svid.id.to_string(), "spiffe://trustdomain/host");
 }

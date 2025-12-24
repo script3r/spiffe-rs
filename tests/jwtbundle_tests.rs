@@ -1,5 +1,5 @@
-use spiffe_rs::bundle::jwtbundle::{Bundle, Set};
 use spiffe_rs::bundle::jwtbundle::JwtKey;
+use spiffe_rs::bundle::jwtbundle::{Bundle, Set};
 use spiffe_rs::spiffeid::require_trust_domain_from_string;
 use std::collections::HashMap;
 use std::fs;
@@ -11,7 +11,8 @@ fn load_file(path: &str) -> Vec<u8> {
 #[test]
 fn bundle_load_read_parse() {
     let td = require_trust_domain_from_string("example.org");
-    let bundle = Bundle::load(td.clone(), "tests/testdata/jwtbundle/jwks_valid_1.json").expect("load");
+    let bundle =
+        Bundle::load(td.clone(), "tests/testdata/jwtbundle/jwks_valid_1.json").expect("load");
     assert_eq!(bundle.jwt_authorities().len(), 1);
 
     let bytes = load_file("tests/testdata/jwtbundle/jwks_valid_2.json");
@@ -54,14 +55,16 @@ fn bundle_crud_and_equal() {
     bundle.remove_jwt_authority("key-1");
     assert!(!bundle.has_jwt_authority("key-1"));
 
-    bundle.add_jwt_authority(
-        "key-1",
-        JwtKey::Ec {
-            crv: "P-256".to_string(),
-            x: vec![1],
-            y: vec![2],
-        },
-    ).expect("add");
+    bundle
+        .add_jwt_authority(
+            "key-1",
+            JwtKey::Ec {
+                crv: "P-256".to_string(),
+                x: vec![1],
+                y: vec![2],
+            },
+        )
+        .expect("add");
 
     let cloned = bundle.clone_bundle();
     assert!(bundle.equal(&cloned));
@@ -70,7 +73,8 @@ fn bundle_crud_and_equal() {
 #[test]
 fn bundle_marshal_roundtrip() {
     let td = require_trust_domain_from_string("example.org");
-    let bundle = Bundle::load(td.clone(), "tests/testdata/jwtbundle/jwks_valid_2.json").expect("load");
+    let bundle =
+        Bundle::load(td.clone(), "tests/testdata/jwtbundle/jwks_valid_2.json").expect("load");
     let bytes = bundle.marshal().expect("marshal");
     let parsed = Bundle::parse(td, &bytes).expect("parse");
     assert!(bundle.equal(&parsed));
@@ -81,14 +85,19 @@ fn bundle_get_for_trust_domain() {
     let td = require_trust_domain_from_string("example.org");
     let td2 = require_trust_domain_from_string("example-2.org");
     let bundle = Bundle::new(td.clone());
-    let ok = bundle.get_jwt_bundle_for_trust_domain(td.clone()).expect("bundle");
+    let ok = bundle
+        .get_jwt_bundle_for_trust_domain(td.clone())
+        .expect("bundle");
     assert!(bundle.equal(&ok));
 
     let err = bundle
         .get_jwt_bundle_for_trust_domain(td2)
         .unwrap_err()
         .to_string();
-    assert_eq!(err, "jwtbundle: no JWT bundle for trust domain \"example-2.org\"");
+    assert_eq!(
+        err,
+        "jwtbundle: no JWT bundle for trust domain \"example-2.org\""
+    );
 }
 
 #[test]
@@ -109,5 +118,8 @@ fn set_ops() {
         .get_jwt_bundle_for_trust_domain(require_trust_domain_from_string("missing.test"))
         .unwrap_err()
         .to_string();
-    assert_eq!(err, "jwtbundle: no JWT bundle for trust domain \"missing.test\"");
+    assert_eq!(
+        err,
+        "jwtbundle: no JWT bundle for trust domain \"missing.test\""
+    );
 }

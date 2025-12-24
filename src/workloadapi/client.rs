@@ -7,15 +7,15 @@ use crate::workloadapi::proto::{
     JwtBundlesRequest, JwtBundlesResponse, JwtsvidRequest, JwtsvidResponse, ValidateJwtsvidRequest,
     X509BundlesRequest, X509BundlesResponse, X509svidRequest, X509svidResponse,
 };
-use crate::workloadapi::{target_from_address, wrap_error, Backoff, Error, Result};
 use crate::workloadapi::{option::ClientConfig, Context};
-use tower::service_fn;
+use crate::workloadapi::{target_from_address, wrap_error, Backoff, Error, Result};
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::net::UnixStream;
 use tonic::metadata::MetadataValue;
 use tonic::transport::{Channel, Endpoint};
 use tonic::{Code, Request, Status};
+use tower::service_fn;
 
 /// A client for the SPIFFE Workload API.
 ///
@@ -39,9 +39,8 @@ impl Client {
 
         let address = match config.address.clone() {
             Some(addr) => addr,
-            None => crate::workloadapi::get_default_address().ok_or_else(|| {
-                wrap_error("workload endpoint socket address is not configured")
-            })?,
+            None => crate::workloadapi::get_default_address()
+                .ok_or_else(|| wrap_error("workload endpoint socket address is not configured"))?,
         };
         let target = target_from_address(&address)?;
         let channel = connect_channel(&target, &config.dial_options).await?;
@@ -58,8 +57,12 @@ impl Client {
     pub async fn fetch_x509_svid(&self, ctx: &Context) -> Result<x509svid::SVID> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(X509svidRequest {}));
-        let mut stream = cancelable(ctx, client.fetch_x509svid(request)).await?.into_inner();
-        let response = cancelable(ctx, stream.message()).await?.ok_or_else(|| wrap_error("stream closed"))?;
+        let mut stream = cancelable(ctx, client.fetch_x509svid(request))
+            .await?
+            .into_inner();
+        let response = cancelable(ctx, stream.message())
+            .await?
+            .ok_or_else(|| wrap_error("stream closed"))?;
         let svids = parse_x509_svids(response, true)?;
         Ok(svids
             .into_iter()
@@ -71,8 +74,12 @@ impl Client {
     pub async fn fetch_x509_svids(&self, ctx: &Context) -> Result<Vec<x509svid::SVID>> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(X509svidRequest {}));
-        let mut stream = cancelable(ctx, client.fetch_x509svid(request)).await?.into_inner();
-        let response = cancelable(ctx, stream.message()).await?.ok_or_else(|| wrap_error("stream closed"))?;
+        let mut stream = cancelable(ctx, client.fetch_x509svid(request))
+            .await?
+            .into_inner();
+        let response = cancelable(ctx, stream.message())
+            .await?
+            .ok_or_else(|| wrap_error("stream closed"))?;
         parse_x509_svids(response, false)
     }
 
@@ -80,16 +87,27 @@ impl Client {
     pub async fn fetch_x509_bundles(&self, ctx: &Context) -> Result<x509bundle::Set> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(X509BundlesRequest {}));
-        let mut stream = cancelable(ctx, client.fetch_x509_bundles(request)).await?.into_inner();
-        let resp = cancelable(ctx, stream.message()).await?.ok_or_else(|| wrap_error("stream closed"))?;
+        let mut stream = cancelable(ctx, client.fetch_x509_bundles(request))
+            .await?
+            .into_inner();
+        let resp = cancelable(ctx, stream.message())
+            .await?
+            .ok_or_else(|| wrap_error("stream closed"))?;
         parse_x509_bundles_response(resp)
     }
 
     /// Watches for X.509 bundle updates from the Workload API.
-    pub async fn watch_x509_bundles(&self, ctx: &Context, watcher: Arc<dyn X509BundleWatcher>) -> Result<()> {
+    pub async fn watch_x509_bundles(
+        &self,
+        ctx: &Context,
+        watcher: Arc<dyn X509BundleWatcher>,
+    ) -> Result<()> {
         let mut backoff = self.config.backoff_strategy.new_backoff();
         loop {
-            if let Err(err) = self.watch_x509_bundles_once(ctx, watcher.clone(), &mut *backoff).await {
+            if let Err(err) = self
+                .watch_x509_bundles_once(ctx, watcher.clone(), &mut *backoff)
+                .await
+            {
                 watcher.on_x509_bundles_watch_error(err.clone());
                 if let Some(err) = self.handle_watch_error(ctx, err, &mut *backoff).await {
                     return Err(err);
@@ -99,11 +117,18 @@ impl Client {
     }
 
     /// Fetches the X.509 context (SVIDs and bundles) from the Workload API.
-    pub async fn fetch_x509_context(&self, ctx: &Context) -> Result<crate::workloadapi::X509Context> {
+    pub async fn fetch_x509_context(
+        &self,
+        ctx: &Context,
+    ) -> Result<crate::workloadapi::X509Context> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(X509svidRequest {}));
-        let mut stream = cancelable(ctx, client.fetch_x509svid(request)).await?.into_inner();
-        let response = cancelable(ctx, stream.message()).await?.ok_or_else(|| wrap_error("stream closed"))?;
+        let mut stream = cancelable(ctx, client.fetch_x509svid(request))
+            .await?
+            .into_inner();
+        let response = cancelable(ctx, stream.message())
+            .await?
+            .ok_or_else(|| wrap_error("stream closed"))?;
         parse_x509_context(response)
     }
 
@@ -115,7 +140,10 @@ impl Client {
     ) -> Result<()> {
         let mut backoff = self.config.backoff_strategy.new_backoff();
         loop {
-            if let Err(err) = self.watch_x509_context_once(ctx, watcher.clone(), &mut *backoff).await {
+            if let Err(err) = self
+                .watch_x509_context_once(ctx, watcher.clone(), &mut *backoff)
+                .await
+            {
                 watcher.on_x509_context_watch_error(err.clone());
                 if let Some(err) = self.handle_watch_error(ctx, err, &mut *backoff).await {
                     return Err(err);
@@ -125,7 +153,11 @@ impl Client {
     }
 
     /// Fetches a single JWT SVID from the Workload API.
-    pub async fn fetch_jwt_svid(&self, ctx: &Context, params: jwtsvid::Params) -> Result<jwtsvid::SVID> {
+    pub async fn fetch_jwt_svid(
+        &self,
+        ctx: &Context,
+        params: jwtsvid::Params,
+    ) -> Result<jwtsvid::SVID> {
         let mut client = self.inner.clone();
         let audience = params.audience_list();
         let request = with_header(Request::new(JwtsvidRequest {
@@ -141,7 +173,11 @@ impl Client {
     }
 
     /// Fetches multiple JWT SVIDs from the Workload API.
-    pub async fn fetch_jwt_svids(&self, ctx: &Context, params: jwtsvid::Params) -> Result<Vec<jwtsvid::SVID>> {
+    pub async fn fetch_jwt_svids(
+        &self,
+        ctx: &Context,
+        params: jwtsvid::Params,
+    ) -> Result<Vec<jwtsvid::SVID>> {
         let mut client = self.inner.clone();
         let audience = params.audience_list();
         let request = with_header(Request::new(JwtsvidRequest {
@@ -156,16 +192,27 @@ impl Client {
     pub async fn fetch_jwt_bundles(&self, ctx: &Context) -> Result<jwtbundle::Set> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(JwtBundlesRequest {}));
-        let mut stream = cancelable(ctx, client.fetch_jwt_bundles(request)).await?.into_inner();
-        let resp = cancelable(ctx, stream.message()).await?.ok_or_else(|| wrap_error("stream closed"))?;
+        let mut stream = cancelable(ctx, client.fetch_jwt_bundles(request))
+            .await?
+            .into_inner();
+        let resp = cancelable(ctx, stream.message())
+            .await?
+            .ok_or_else(|| wrap_error("stream closed"))?;
         parse_jwt_bundles(resp)
     }
 
     /// Watches for JWT bundle updates from the Workload API.
-    pub async fn watch_jwt_bundles(&self, ctx: &Context, watcher: Arc<dyn JWTBundleWatcher>) -> Result<()> {
+    pub async fn watch_jwt_bundles(
+        &self,
+        ctx: &Context,
+        watcher: Arc<dyn JWTBundleWatcher>,
+    ) -> Result<()> {
         let mut backoff = self.config.backoff_strategy.new_backoff();
         loop {
-            if let Err(err) = self.watch_jwt_bundles_once(ctx, watcher.clone(), &mut *backoff).await {
+            if let Err(err) = self
+                .watch_jwt_bundles_once(ctx, watcher.clone(), &mut *backoff)
+                .await
+            {
                 watcher.on_jwt_bundles_watch_error(err.clone());
                 if let Some(err) = self.handle_watch_error(ctx, err, &mut *backoff).await {
                     return Err(err);
@@ -175,7 +222,12 @@ impl Client {
     }
 
     /// Validates a JWT SVID token using the Workload API.
-    pub async fn validate_jwt_svid(&self, ctx: &Context, token: &str, audience: &str) -> Result<jwtsvid::SVID> {
+    pub async fn validate_jwt_svid(
+        &self,
+        ctx: &Context,
+        token: &str,
+        audience: &str,
+    ) -> Result<jwtsvid::SVID> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(ValidateJwtsvidRequest {
             svid: token.to_string(),
@@ -191,7 +243,10 @@ impl Client {
         err: Error,
         backoff: &mut dyn Backoff,
     ) -> Option<Error> {
-        let status = err.status().cloned().unwrap_or_else(|| Status::unknown(err.to_string()));
+        let status = err
+            .status()
+            .cloned()
+            .unwrap_or_else(|| Status::unknown(err.to_string()));
         match status.code() {
             Code::Cancelled => return Some(err),
             Code::InvalidArgument => {
@@ -225,10 +280,16 @@ impl Client {
     ) -> Result<()> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(X509svidRequest {}));
-        let mut stream = cancelable(ctx, client.fetch_x509svid(request)).await?.into_inner();
-        self.config.log.debugf(format_args!("Watching X.509 contexts"));
+        let mut stream = cancelable(ctx, client.fetch_x509svid(request))
+            .await?
+            .into_inner();
+        self.config
+            .log
+            .debugf(format_args!("Watching X.509 contexts"));
         loop {
-            let resp = cancelable(ctx, stream.message()).await?.ok_or_else(|| wrap_error("stream closed"))?;
+            let resp = cancelable(ctx, stream.message())
+                .await?
+                .ok_or_else(|| wrap_error("stream closed"))?;
             backoff.reset();
             match parse_x509_context(resp) {
                 Ok(context) => watcher.on_x509_context_update(context),
@@ -250,10 +311,14 @@ impl Client {
     ) -> Result<()> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(JwtBundlesRequest {}));
-        let mut stream = cancelable(ctx, client.fetch_jwt_bundles(request)).await?.into_inner();
+        let mut stream = cancelable(ctx, client.fetch_jwt_bundles(request))
+            .await?
+            .into_inner();
         self.config.log.debugf(format_args!("Watching JWT bundles"));
         loop {
-            let resp = cancelable(ctx, stream.message()).await?.ok_or_else(|| wrap_error("stream closed"))?;
+            let resp = cancelable(ctx, stream.message())
+                .await?
+                .ok_or_else(|| wrap_error("stream closed"))?;
             backoff.reset();
             match parse_jwt_bundles(resp) {
                 Ok(bundles) => watcher.on_jwt_bundles_update(bundles),
@@ -275,17 +340,24 @@ impl Client {
     ) -> Result<()> {
         let mut client = self.inner.clone();
         let request = with_header(Request::new(X509BundlesRequest {}));
-        let mut stream = cancelable(ctx, client.fetch_x509_bundles(request)).await?.into_inner();
-        self.config.log.debugf(format_args!("Watching X.509 bundles"));
+        let mut stream = cancelable(ctx, client.fetch_x509_bundles(request))
+            .await?
+            .into_inner();
+        self.config
+            .log
+            .debugf(format_args!("Watching X.509 bundles"));
         loop {
-            let resp = cancelable(ctx, stream.message()).await?.ok_or_else(|| wrap_error("stream closed"))?;
+            let resp = cancelable(ctx, stream.message())
+                .await?
+                .ok_or_else(|| wrap_error("stream closed"))?;
             backoff.reset();
             match parse_x509_bundles_response(resp) {
                 Ok(bundles) => watcher.on_x509_bundles_update(bundles),
                 Err(err) => {
-                    self.config
-                        .log
-                        .errorf(format_args!("Failed to parse X.509 bundle response: {}", err));
+                    self.config.log.errorf(format_args!(
+                        "Failed to parse X.509 bundle response: {}",
+                        err
+                    ));
                     watcher.on_x509_bundles_watch_error(err);
                 }
             }
@@ -300,7 +372,10 @@ fn with_header<T>(mut request: Request<T>) -> Request<T> {
     request
 }
 
-async fn connect_channel(target: &str, options: &[Arc<dyn crate::workloadapi::DialOption>]) -> Result<Channel> {
+async fn connect_channel(
+    target: &str,
+    options: &[Arc<dyn crate::workloadapi::DialOption>],
+) -> Result<Channel> {
     if let Ok(url) = url::Url::parse(target) {
         if url.scheme() == "unix" {
             let path = unix_path_from_url(&url)?;
@@ -331,7 +406,9 @@ async fn connect_channel(target: &str, options: &[Arc<dyn crate::workloadapi::Di
 
 fn unix_path_from_url(url: &url::Url) -> Result<std::path::PathBuf> {
     if url.cannot_be_a_base() {
-        return Err(wrap_error("workload endpoint unix socket URI must not be opaque"));
+        return Err(wrap_error(
+            "workload endpoint unix socket URI must not be opaque",
+        ));
     }
     let host = url.host_str().unwrap_or("");
     let raw_path = if host.is_empty() {
@@ -342,7 +419,9 @@ fn unix_path_from_url(url: &url::Url) -> Result<std::path::PathBuf> {
         format!("/{host}{}", url.path())
     };
     if raw_path.is_empty() || raw_path == "/" {
-        return Err(wrap_error("workload endpoint unix socket URI must include a path"));
+        return Err(wrap_error(
+            "workload endpoint unix socket URI must include a path",
+        ));
     }
     Ok(std::path::PathBuf::from(raw_path))
 }
@@ -392,7 +471,8 @@ fn parse_x509_bundles(resp: X509svidResponse) -> Result<x509bundle::Set> {
         let td = ID::from_string(&svid.spiffe_id)
             .map_err(|err| wrap_error(err))?
             .trust_domain();
-        bundles.push(x509bundle::Bundle::parse_raw(td, &svid.bundle).map_err(|err| wrap_error(err))?);
+        bundles
+            .push(x509bundle::Bundle::parse_raw(td, &svid.bundle).map_err(|err| wrap_error(err))?);
     }
     for (td_id, bundle) in resp.federated_bundles {
         let td = spiffeid::trust_domain_from_string(&td_id).map_err(|err| wrap_error(err))?;
@@ -410,7 +490,11 @@ fn parse_x509_bundles_response(resp: X509BundlesResponse) -> Result<x509bundle::
     Ok(x509bundle::Set::new(&bundles))
 }
 
-fn parse_jwt_svids(resp: JwtsvidResponse, audience: &[String], first_only: bool) -> Result<Vec<jwtsvid::SVID>> {
+fn parse_jwt_svids(
+    resp: JwtsvidResponse,
+    audience: &[String],
+    first_only: bool,
+) -> Result<Vec<jwtsvid::SVID>> {
     let mut svids = resp.svids;
     if svids.is_empty() {
         return Err(wrap_error("there were no SVIDs in the response"));
@@ -425,7 +509,8 @@ fn parse_jwt_svids(resp: JwtsvidResponse, audience: &[String], first_only: bool)
         if !svid.hint.is_empty() && !seen.insert(svid.hint.clone()) {
             continue;
         }
-        let mut parsed = jwtsvid::parse_insecure(&svid.svid, audience).map_err(|err| wrap_error(err))?;
+        let mut parsed =
+            jwtsvid::parse_insecure(&svid.svid, audience).map_err(|err| wrap_error(err))?;
         parsed.hint = svid.hint;
         out.push(parsed);
     }

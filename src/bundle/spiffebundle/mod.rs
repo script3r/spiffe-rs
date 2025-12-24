@@ -5,13 +5,13 @@ use crate::internal::jwtutil;
 use crate::internal::x509util;
 use crate::spiffeid::TrustDomain;
 use base64::Engine;
+use oid_registry::{OID_EC_P256, OID_KEY_TYPE_EC_PUBLIC_KEY, OID_NIST_EC_P384, OID_NIST_EC_P521};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
 use std::io::Read;
 use std::sync::RwLock;
 use std::time::Duration;
-use oid_registry::{OID_EC_P256, OID_KEY_TYPE_EC_PUBLIC_KEY, OID_NIST_EC_P384, OID_NIST_EC_P521};
 use x509_parser::prelude::X509Certificate;
 
 const X509_SVID_USE: &str = "x509-svid";
@@ -70,8 +70,8 @@ impl Bundle {
 
     /// Loads a SPIFFE bundle from a JSON file (JWKS).
     pub fn load(trust_domain: TrustDomain, path: &str) -> Result<Bundle> {
-        let bytes =
-            fs::read(path).map_err(|err| wrap_error(format!("unable to read SPIFFE bundle: {}", err)))?;
+        let bytes = fs::read(path)
+            .map_err(|err| wrap_error(format!("unable to read SPIFFE bundle: {}", err)))?;
         Bundle::parse(trust_domain, &bytes)
     }
 
@@ -86,8 +86,8 @@ impl Bundle {
 
     /// Parses a SPIFFE bundle from JSON bytes (JWKS).
     pub fn parse(trust_domain: TrustDomain, bytes: &[u8]) -> Result<Bundle> {
-        let jwks: JwkDocument =
-            serde_json::from_slice(bytes).map_err(|err| wrap_error(format!("unable to parse JWKS: {}", err)))?;
+        let jwks: JwkDocument = serde_json::from_slice(bytes)
+            .map_err(|err| wrap_error(format!("unable to parse JWKS: {}", err)))?;
         let bundle = Bundle::new(trust_domain);
         if let Some(hint) = jwks.spiffe_refresh_hint {
             bundle.set_refresh_hint(Duration::from_secs(hint as u64));
@@ -96,18 +96,18 @@ impl Bundle {
             bundle.set_sequence_number(seq);
         }
 
-        let keys = jwks.keys.ok_or_else(|| wrap_error("no authorities found"))?;
+        let keys = jwks
+            .keys
+            .ok_or_else(|| wrap_error("no authorities found"))?;
         for (idx, key) in keys.iter().enumerate() {
             match key.use_field.as_deref() {
                 Some(X509_SVID_USE) => {
-                    let cert = key
-                        .x509_certificate_der()
-                        .ok_or_else(|| {
-                            wrap_error(format!(
-                                "expected a single certificate in {} entry {}; got 0",
-                                X509_SVID_USE, idx
-                            ))
-                        })?;
+                    let cert = key.x509_certificate_der().ok_or_else(|| {
+                        wrap_error(format!(
+                            "expected a single certificate in {} entry {}; got 0",
+                            X509_SVID_USE, idx
+                        ))
+                    })?;
                     if let Some(count) = key.x5c.as_ref().map(|x| x.len()) {
                         if count != 1 {
                             return Err(wrap_error(format!(
@@ -120,9 +120,9 @@ impl Bundle {
                 }
                 Some(JWT_SVID_USE) => {
                     let key_id = key.key_id().unwrap_or_default();
-                    let jwt_key = key
-                        .to_jwt_key()
-                        .map_err(|err| wrap_error(format!("error adding authority {} of JWKS: {}", idx, err)))?;
+                    let jwt_key = key.to_jwt_key().map_err(|err| {
+                        wrap_error(format!("error adding authority {} of JWKS: {}", idx, err))
+                    })?;
                     if let Err(err) = bundle.add_jwt_authority(key_id, jwt_key) {
                         return Err(wrap_error(format!(
                             "error adding authority {} of JWKS: {}",
@@ -379,7 +379,10 @@ impl Bundle {
     }
 
     /// Returns the X.509 bundle for the given trust domain if it matches.
-    pub fn get_x509_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<x509bundle::Bundle> {
+    pub fn get_x509_bundle_for_trust_domain(
+        &self,
+        trust_domain: TrustDomain,
+    ) -> Result<x509bundle::Bundle> {
         if self.trust_domain != trust_domain {
             return Err(wrap_error(format!(
                 "no X.509 bundle for trust domain \"{}\"",
@@ -390,7 +393,10 @@ impl Bundle {
     }
 
     /// Returns the JWT bundle for the given trust domain if it matches.
-    pub fn get_jwt_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<jwtbundle::Bundle> {
+    pub fn get_jwt_bundle_for_trust_domain(
+        &self,
+        trust_domain: TrustDomain,
+    ) -> Result<jwtbundle::Bundle> {
         if self.trust_domain != trust_domain {
             return Err(wrap_error(format!(
                 "no JWT bundle for trust domain \"{}\"",
@@ -496,7 +502,10 @@ impl Set {
     }
 
     /// Returns the X.509 bundle for the given trust domain.
-    pub fn get_x509_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<x509bundle::Bundle> {
+    pub fn get_x509_bundle_for_trust_domain(
+        &self,
+        trust_domain: TrustDomain,
+    ) -> Result<x509bundle::Bundle> {
         let guard = self
             .bundles
             .read()
@@ -511,7 +520,10 @@ impl Set {
     }
 
     /// Returns the JWT bundle for the given trust domain.
-    pub fn get_jwt_bundle_for_trust_domain(&self, trust_domain: TrustDomain) -> Result<jwtbundle::Bundle> {
+    pub fn get_jwt_bundle_for_trust_domain(
+        &self,
+        trust_domain: TrustDomain,
+    ) -> Result<jwtbundle::Bundle> {
         let guard = self
             .bundles
             .read()
@@ -620,7 +632,9 @@ fn ec_public_key_parameters(cert: &X509Certificate<'_>) -> Result<(String, Vec<u
             .parameters
             .as_ref()
             .ok_or_else(|| wrap_error("missing EC parameters"))?;
-        let oid = params.as_oid().map_err(|_| wrap_error("invalid EC parameters"))?;
+        let oid = params
+            .as_oid()
+            .map_err(|_| wrap_error("invalid EC parameters"))?;
         if oid == OID_EC_P256 {
             "P-256".to_string()
         } else if oid == OID_NIST_EC_P384 {

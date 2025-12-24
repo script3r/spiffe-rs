@@ -17,8 +17,11 @@ fn spiffebundle_marshal_matches_go() {
         return;
     }
 
-    let temp_dir = std::env::temp_dir()
-        .join(format!("spiffe_rs_compat_{}_{}", std::process::id(), chrono_stamp()));
+    let temp_dir = std::env::temp_dir().join(format!(
+        "spiffe_rs_compat_{}_{}",
+        std::process::id(),
+        chrono_stamp()
+    ));
     fs::create_dir_all(&temp_dir).expect("create temp dir");
 
     let go_mod = format!(
@@ -28,9 +31,7 @@ fn spiffebundle_marshal_matches_go() {
     fs::write(temp_dir.join("go.mod"), go_mod).expect("write go.mod");
 
     let input = PathBuf::from("tests/testdata/spiffebundle/spiffebundle_valid_1.json");
-    let input_abs = input
-        .canonicalize()
-        .expect("canonicalize test bundle path");
+    let input_abs = input.canonicalize().expect("canonicalize test bundle path");
     let trust_domain = "domain.test";
     let main = format!(
         r#"

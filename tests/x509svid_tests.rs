@@ -1,5 +1,5 @@
-use spiffe_rs::svid::x509svid;
 use spiffe_rs::spiffeid::ID;
+use spiffe_rs::svid::x509svid;
 use std::fs;
 
 fn load_file(path: &str) -> Vec<u8> {
@@ -76,7 +76,10 @@ fn marshal_roundtrip() {
     let cert_single = "tests/testdata/x509svid/good-leaf-only.pem";
     let svid = x509svid::SVID::load(cert_single, key_rsa).expect("load");
     let (certs, key) = svid.marshal().expect("marshal");
-    assert_eq!(normalize_pem(&certs), normalize_pem(&load_file(cert_single)));
+    assert_eq!(
+        normalize_pem(&certs),
+        normalize_pem(&load_file(cert_single))
+    );
     assert_eq!(normalize_pem(&key), normalize_pem(&load_file(key_rsa)));
 }
 
@@ -113,5 +116,8 @@ fn parse_raw_roundtrip() {
             .expect("private key")
     };
     let svid = x509svid::SVID::parse_raw(&cert_raw, &key_der).expect("parse raw");
-    assert_eq!(svid.id, ID::from_string("spiffe://example.org/workload-1").unwrap());
+    assert_eq!(
+        svid.id,
+        ID::from_string("spiffe://example.org/workload-1").unwrap()
+    );
 }

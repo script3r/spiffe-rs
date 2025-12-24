@@ -1,4 +1,4 @@
-use crate::spiffeid::{ID, TrustDomain};
+use crate::spiffeid::{TrustDomain, ID};
 
 /// An error that occurred during SPIFFE ID matching.
 #[derive(Debug, Clone, PartialEq, Eq)]

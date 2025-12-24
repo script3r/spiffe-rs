@@ -11,8 +11,9 @@ pub fn peer_id_from_stream(certs: Option<&[rustls::Certificate]>) -> Result<ID> 
     let cert = certs
         .first()
         .ok_or_else(|| crate::spiffetls::wrap_error("no peer certificates"))?;
-    let (_rest, parsed) = x509_parser::parse_x509_certificate(&cert.0)
-        .map_err(|err| crate::spiffetls::wrap_error(format!("invalid peer certificate: {}", err)))?;
+    let (_rest, parsed) = x509_parser::parse_x509_certificate(&cert.0).map_err(|err| {
+        crate::spiffetls::wrap_error(format!("invalid peer certificate: {}", err))
+    })?;
     let san = parsed
         .subject_alternative_name()
         .map_err(|_| crate::spiffetls::wrap_error("invalid peer certificate: invalid URI SAN"))?

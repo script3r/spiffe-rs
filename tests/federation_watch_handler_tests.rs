@@ -52,7 +52,13 @@ fn start_sequence_server(bodies: Vec<Vec<u8>>) -> (String, std::thread::JoinHand
             let body = queue
                 .lock()
                 .ok()
-                .and_then(|mut q| if !q.is_empty() { Some(q.remove(0)) } else { None })
+                .and_then(|mut q| {
+                    if !q.is_empty() {
+                        Some(q.remove(0))
+                    } else {
+                        None
+                    }
+                })
                 .unwrap_or_default();
             let response = format!(
                 "HTTP/1.1 200 OK\r\nContent-Length: {}\r\nConnection: close\r\n\r\n",
@@ -95,8 +101,8 @@ async fn handler_serves_bundle() {
     let body = fs::read("tests/testdata/spiffebundle/spiffebundle_valid_1.json").expect("bundle");
     let bundle = spiffebundle::Bundle::parse(trust_domain.clone(), &body).expect("parse bundle");
     let source = spiffebundle::Set::new(&[bundle.clone_bundle()]);
-    let mut handler = federation::new_handler(trust_domain, Arc::new(source), Vec::new())
-    .expect("handler");
+    let mut handler =
+        federation::new_handler(trust_domain, Arc::new(source), Vec::new()).expect("handler");
 
     let response = Service::call(&mut handler, hyper::Request::new(hyper::Body::empty()))
         .await

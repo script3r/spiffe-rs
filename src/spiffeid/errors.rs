@@ -10,7 +10,9 @@ pub enum Error {
     #[error("trust domain characters are limited to lowercase letters, numbers, dots, dashes, and underscores")]
     BadTrustDomainChar,
     /// The path contains an invalid character.
-    #[error("path segment characters are limited to letters, numbers, dots, dashes, and underscores")]
+    #[error(
+        "path segment characters are limited to letters, numbers, dots, dashes, and underscores"
+    )]
     BadPathSegmentChar,
     /// The path contains a dot segment (`.` or `..`).
     #[error("path cannot contain dot segments")]

@@ -14,9 +14,13 @@ pub struct Listener {
 impl Listener {
     /// Accepts a new connection and performs the TLS handshake.
     pub fn accept(&self) -> Result<ServerStream> {
-        let (sock, _addr) = self.inner.accept().map_err(|err| crate::spiffetls::wrap_error(err))?;
-        let conn = rustls::ServerConnection::new(self.config.clone())
-            .map_err(|err| crate::spiffetls::wrap_error(format!("unable to create server connection: {}", err)))?;
+        let (sock, _addr) = self
+            .inner
+            .accept()
+            .map_err(|err| crate::spiffetls::wrap_error(err))?;
+        let conn = rustls::ServerConnection::new(self.config.clone()).map_err(|err| {
+            crate::spiffetls::wrap_error(format!("unable to create server connection: {}", err))
+        })?;
         Ok(ServerStream {
             inner: rustls::StreamOwned::new(conn, sock),
         })
@@ -24,13 +28,18 @@ impl Listener {
 
     /// Returns the local address the listener is bound to.
     pub fn local_addr(&self) -> Result<SocketAddr> {
-        self.inner.local_addr().map_err(|err| crate::spiffetls::wrap_error(err))
+        self.inner
+            .local_addr()
+            .map_err(|err| crate::spiffetls::wrap_error(err))
     }
 
     /// Closes the listener and its underlying source if it was created by the listener.
     pub async fn close(self) -> Result<()> {
         if let Some(source) = self.source {
-            source.close().await.map_err(|err| crate::spiffetls::Error(err.to_string()))?;
+            source
+                .close()
+                .await
+                .map_err(|err| crate::spiffetls::Error(err.to_string()))?;
         }
         Ok(())
     }
@@ -71,7 +80,13 @@ pub async fn listen(
     authorizer: tlsconfig::Authorizer,
     options: Vec<Box<dyn ListenOption>>,
 ) -> Result<Listener> {
-    listen_with_mode(ctx, addr, crate::spiffetls::mtls_server(authorizer), options).await
+    listen_with_mode(
+        ctx,
+        addr,
+        crate::spiffetls::mtls_server(authorizer),
+        options,
+    )
+    .await
 }
 
 /// Listens for SPIFFE-TLS connections with the given mode.
@@ -103,12 +118,18 @@ pub async fn listen_with_mode(
 
     let tls_config = match m.mode {
         crate::spiffetls::mode::ServerMode::Tls => {
-            let svid = m.svid.ok_or_else(|| crate::spiffetls::wrap_error("missing svid source"))?;
+            let svid = m
+                .svid
+                .ok_or_else(|| crate::spiffetls::wrap_error("missing svid source"))?;
             tlsconfig::tls_server_config_with_options(svid.as_ref(), &config.tls_options)?
         }
         crate::spiffetls::mode::ServerMode::Mtls => {
-            let svid = m.svid.ok_or_else(|| crate::spiffetls::wrap_error("missing svid source"))?;
-            let bundle = m.bundle.ok_or_else(|| crate::spiffetls::wrap_error("missing bundle source"))?;
+            let svid = m
+                .svid
+                .ok_or_else(|| crate::spiffetls::wrap_error("missing svid source"))?;
+            let bundle = m
+                .bundle
+                .ok_or_else(|| crate::spiffetls::wrap_error("missing bundle source"))?;
             tlsconfig::mtls_server_config_with_options(
                 svid.as_ref(),
                 bundle,
@@ -117,8 +138,12 @@ pub async fn listen_with_mode(
             )?
         }
         crate::spiffetls::mode::ServerMode::MtlsWeb => {
-            let bundle = m.bundle.ok_or_else(|| crate::spiffetls::wrap_error("missing bundle source"))?;
-            let cert = m.web_cert.ok_or_else(|| crate::spiffetls::wrap_error("missing web cert"))?;
+            let bundle = m
+                .bundle
+                .ok_or_else(|| crate::spiffetls::wrap_error("missing bundle source"))?;
+            let cert = m
+                .web_cert
+                .ok_or_else(|| crate::spiffetls::wrap_error("missing web cert"))?;
             tlsconfig::mtls_web_server_config(cert, bundle, m.authorizer.clone())?
         }
     };

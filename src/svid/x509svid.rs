@@ -54,17 +54,15 @@ impl SVID {
     pub fn load(cert_file: &str, key_file: &str) -> Result<SVID> {
         let cert_bytes = fs::read(cert_file)
             .map_err(|err| wrap_error(format!("cannot read certificate file: {}", err)))?;
-        let key_bytes =
-            fs::read(key_file).map_err(|err| wrap_error(format!("cannot read key file: {}", err)))?;
+        let key_bytes = fs::read(key_file)
+            .map_err(|err| wrap_error(format!("cannot read key file: {}", err)))?;
         SVID::parse(&cert_bytes, &key_bytes)
     }
 
     /// Parses an X.509 SVID from PEM encoded bytes.
     pub fn parse(cert_bytes: &[u8], key_bytes: &[u8]) -> Result<SVID> {
-        let certs =
-            pemutil::parse_certificates(cert_bytes).map_err(|err| {
-                wrap_error(format!("cannot parse PEM encoded certificate: {}", err))
-            })?;
+        let certs = pemutil::parse_certificates(cert_bytes)
+            .map_err(|err| wrap_error(format!("cannot parse PEM encoded certificate: {}", err)))?;
         let key = parse_private_key_pem(key_bytes)
             .map_err(|err| wrap_error(format!("cannot parse PEM encoded private key: {}", err)))?;
         new_svid(certs, key)
@@ -100,7 +98,9 @@ impl SVID {
             return Err(wrap_error("no certificates to marshal"));
         }
         if self.private_key.is_empty() {
-            return Err(wrap_error("cannot marshal private key: missing private key"));
+            return Err(wrap_error(
+                "cannot marshal private key: missing private key",
+            ));
         }
         let mut certs = Vec::new();
         for cert in &self.certificates {
@@ -215,8 +215,7 @@ fn validate_certificates(certs: &[Vec<u8>]) -> Result<ID> {
             "leaf certificate must not have CA flag set to true".to_string(),
         ));
     }
-    validate_leaf_key_usage(&leaf)
-        .map_err(|err| Error(err.to_string()))?;
+    validate_leaf_key_usage(&leaf).map_err(|err| Error(err.to_string()))?;
 
     for cert_bytes in certs.iter().skip(1) {
         let cert = parse_certificate(cert_bytes)?;
@@ -283,7 +282,9 @@ fn id_from_cert(cert: &X509Certificate<'_>) -> Result<ID> {
         return Err(Error("certificate contains no URI SAN".to_string()));
     }
     if uris.len() > 1 {
-        return Err(Error("certificate contains more than one URI SAN".to_string()));
+        return Err(Error(
+            "certificate contains more than one URI SAN".to_string(),
+        ));
     }
     ID::from_string(uris.remove(0)).map_err(|err| Error(err.to_string()))
 }
@@ -298,8 +299,8 @@ fn parse_raw_certificates(bytes: &[u8]) -> std::result::Result<Vec<Vec<u8>>, Str
     let mut remaining = bytes;
     let mut certs = Vec::new();
     while !remaining.is_empty() {
-        let (rest, _cert) = x509_parser::parse_x509_certificate(remaining)
-            .map_err(|err| err.to_string())?;
+        let (rest, _cert) =
+            x509_parser::parse_x509_certificate(remaining).map_err(|err| err.to_string())?;
         let consumed = remaining
             .len()
             .checked_sub(rest.len())
@@ -347,7 +348,9 @@ fn validate_private_key(key_bytes: &[u8], cert_bytes: &[u8]) -> Result<()> {
             if n == modulus && e == exponent {
                 return Ok(());
             }
-            return Err(Error("leaf certificate does not match private key".to_string()));
+            return Err(Error(
+                "leaf certificate does not match private key".to_string(),
+            ));
         }
     }
 
@@ -358,7 +361,9 @@ fn validate_private_key(key_bytes: &[u8], cert_bytes: &[u8]) -> Result<()> {
             if bytes == ec.data() {
                 return Ok(());
             }
-            return Err(Error("leaf certificate does not match private key".to_string()));
+            return Err(Error(
+                "leaf certificate does not match private key".to_string(),
+            ));
         }
     }
 
@@ -369,7 +374,9 @@ fn validate_private_key(key_bytes: &[u8], cert_bytes: &[u8]) -> Result<()> {
             if bytes == ec.data() {
                 return Ok(());
             }
-            return Err(Error("leaf certificate does not match private key".to_string()));
+            return Err(Error(
+                "leaf certificate does not match private key".to_string(),
+            ));
         }
     }
 
@@ -380,7 +387,9 @@ fn validate_private_key(key_bytes: &[u8], cert_bytes: &[u8]) -> Result<()> {
             if bytes == ec.data() {
                 return Ok(());
             }
-            return Err(Error("leaf certificate does not match private key".to_string()));
+            return Err(Error(
+                "leaf certificate does not match private key".to_string(),
+            ));
         }
     }
 
@@ -404,7 +413,8 @@ fn verify_chain(
     let now = now
         .duration_since(SystemTime::UNIX_EPOCH)
         .map_err(|_| "invalid time".to_string())?;
-    let now = ASN1Time::from_timestamp(now.as_secs() as i64).map_err(|_| "invalid time".to_string())?;
+    let now =
+        ASN1Time::from_timestamp(now.as_secs() as i64).map_err(|_| "invalid time".to_string())?;
 
     let parsed = certs
         .iter()

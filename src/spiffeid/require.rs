@@ -1,6 +1,6 @@
 use crate::spiffeid::{
-    format_path, join_path_segments, trust_domain_from_string, trust_domain_from_uri, ID, Result,
-    TrustDomain,
+    format_path, join_path_segments, trust_domain_from_string, trust_domain_from_uri, Result,
+    TrustDomain, ID,
 };
 use url::Url;
 

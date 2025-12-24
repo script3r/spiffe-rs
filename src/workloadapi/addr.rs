@@ -1,6 +1,6 @@
 use crate::workloadapi::{wrap_error, Result};
-use std::net::IpAddr;
 use std::env;
+use std::net::IpAddr;
 use url::Url;
 
 #[allow(non_upper_case_globals)]
@@ -72,12 +72,12 @@ fn parse_target_from_url(url: &Url) -> Result<String> {
         let host = url
             .host_str()
             .ok_or_else(|| wrap_error("workload endpoint tcp socket URI must include a host"))?;
-        let ip: IpAddr = host
-            .parse()
-            .map_err(|_| wrap_error("workload endpoint tcp socket URI host component must be an IP:port"))?;
-        let port = url
-            .port()
-            .ok_or_else(|| wrap_error("workload endpoint tcp socket URI host component must include a port"))?;
+        let ip: IpAddr = host.parse().map_err(|_| {
+            wrap_error("workload endpoint tcp socket URI host component must be an IP:port")
+        })?;
+        let port = url.port().ok_or_else(|| {
+            wrap_error("workload endpoint tcp socket URI host component must include a port")
+        })?;
         return Ok(format!("{}:{}", ip, port));
     }
 

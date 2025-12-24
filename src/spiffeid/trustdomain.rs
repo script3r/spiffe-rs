@@ -1,6 +1,6 @@
 use crate::spiffeid::charset::is_backcompat_trust_domain_char;
 use crate::spiffeid::id::make_id;
-use crate::spiffeid::{Error, ID, Result};
+use crate::spiffeid::{Error, Result, ID};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::cmp::Ordering;
 use url::Url;
@@ -79,12 +79,15 @@ impl TrustDomain {
     /// Unmarshals the trust domain name from a byte slice.
     pub fn unmarshal_text(&mut self, text: &[u8]) -> Result<()> {
         if text.is_empty() {
-            *self = TrustDomain { name: String::new() };
+            *self = TrustDomain {
+                name: String::new(),
+            };
             return Ok(());
         }
-        let parsed = trust_domain_from_string(std::str::from_utf8(text).map_err(|e| {
-            Error::Other(format!("invalid trust domain text: {}", e))
-        })?)?;
+        let parsed = trust_domain_from_string(
+            std::str::from_utf8(text)
+                .map_err(|e| Error::Other(format!("invalid trust domain text: {}", e)))?,
+        )?;
         *self = parsed;
         Ok(())
     }
@@ -98,7 +101,9 @@ impl std::fmt::Display for TrustDomain {
 
 impl Default for TrustDomain {
     fn default() -> Self {
-        TrustDomain { name: String::new() }
+        TrustDomain {
+            name: String::new(),
+        }
     }
 }
 
@@ -122,7 +127,9 @@ impl<'de> Deserialize<'de> for TrustDomain {
     {
         let s = String::deserialize(deserializer)?;
         if s.is_empty() {
-            Ok(TrustDomain { name: String::new() })
+            Ok(TrustDomain {
+                name: String::new(),
+            })
         } else {
             trust_domain_from_string(&s).map_err(serde::de::Error::custom)
         }

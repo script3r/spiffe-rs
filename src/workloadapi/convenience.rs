@@ -60,7 +60,11 @@ where
     result
 }
 
-pub async fn fetch_jwt_svid<I>(ctx: &Context, params: jwtsvid::Params, options: I) -> Result<jwtsvid::SVID>
+pub async fn fetch_jwt_svid<I>(
+    ctx: &Context,
+    params: jwtsvid::Params,
+    options: I,
+) -> Result<jwtsvid::SVID>
 where
     I: IntoIterator<Item = Arc<dyn ClientOption>>,
 {
@@ -70,7 +74,11 @@ where
     result
 }
 
-pub async fn fetch_jwt_svids<I>(ctx: &Context, params: jwtsvid::Params, options: I) -> Result<Vec<jwtsvid::SVID>>
+pub async fn fetch_jwt_svids<I>(
+    ctx: &Context,
+    params: jwtsvid::Params,
+    options: I,
+) -> Result<Vec<jwtsvid::SVID>>
 where
     I: IntoIterator<Item = Arc<dyn ClientOption>>,
 {
@@ -118,7 +126,12 @@ where
     result
 }
 
-pub async fn validate_jwt_svid<I>(ctx: &Context, token: &str, audience: &str, options: I) -> Result<jwtsvid::SVID>
+pub async fn validate_jwt_svid<I>(
+    ctx: &Context,
+    token: &str,
+    audience: &str,
+    options: I,
+) -> Result<jwtsvid::SVID>
 where
     I: IntoIterator<Item = Arc<dyn ClientOption>>,
 {

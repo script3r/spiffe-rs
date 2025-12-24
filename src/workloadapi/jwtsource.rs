@@ -82,7 +82,11 @@ impl JWTSource {
         self.bundles
             .read()
             .ok()
-            .and_then(|guard| guard.as_ref().and_then(|b| b.get_jwt_bundle_for_trust_domain(trust_domain).ok()))
+            .and_then(|guard| {
+                guard
+                    .as_ref()
+                    .and_then(|b| b.get_jwt_bundle_for_trust_domain(trust_domain).ok())
+            })
             .ok_or_else(|| crate::workloadapi::Error::new("jwtsource: no JWT bundle found"))
     }
 
@@ -98,7 +102,9 @@ impl JWTSource {
 
     fn check_closed(&self) -> Result<()> {
         if self.closed.load(std::sync::atomic::Ordering::SeqCst) {
-            return Err(crate::workloadapi::Error::new("jwtsource: source is closed"));
+            return Err(crate::workloadapi::Error::new(
+                "jwtsource: source is closed",
+            ));
         }
         Ok(())
     }

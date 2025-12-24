@@ -37,6 +37,12 @@ pub trait FetchOption {
 }
 
 /// Sets the authentication method to SPIFFE-TLS.
+///
+/// When this option is used, the HTTPS connection is verified using
+/// SPIFFE-TLS:
+/// - the server must present an X.509-SVID whose SPIFFE ID matches
+///   `endpoint_id`
+/// - the server certificate chain must verify against `bundle_source`
 pub fn with_spiffe_auth(
     bundle_source: Arc<dyn x509bundle::Source + Send + Sync>,
     endpoint_id: spiffeid::ID,
@@ -63,12 +69,20 @@ pub fn with_web_pki_roots(roots: RootCertStore) -> impl FetchOption {
                 "cannot use both SPIFFE and Web PKI authentication",
             ));
         }
-        options.auth_method = AuthMethod::WebPki { roots: roots.clone() };
+        options.auth_method = AuthMethod::WebPki {
+            roots: roots.clone(),
+        };
         Ok(())
     })
 }
 
 /// Fetches a SPIFFE bundle from the given URL.
+///
+/// Notes on the HTTP implementation:
+/// - Only `http://` and `https://` are supported.
+/// - The request is a minimal HTTP/1.1 GET over a plain TCP stream.
+/// - The response parser expects a `200` status and splits at `\r\n\r\n`.
+///   Chunked transfer encoding and redirects are not supported.
 pub fn fetch_bundle(
     trust_domain: TrustDomain,
     url: &str,
@@ -95,6 +109,15 @@ pub trait BundleWatcher: Send + Sync {
 }
 
 /// Watches a SPIFFE bundle at the given URL for updates.
+///
+/// This repeatedly calls [`fetch_bundle`] and:
+/// - calls [`BundleWatcher::on_update`] only when the bundle contents change
+///   (as determined by `Bundle::equal`)
+/// - passes fetch errors to [`BundleWatcher::on_error`]
+/// - uses the bundle `refresh_hint` (if present) as input to
+///   [`BundleWatcher::next_refresh`]
+///
+/// The loop exits when `ctx` is cancelled.
 pub async fn watch_bundle(
     ctx: &Context,
     trust_domain: TrustDomain,
@@ -208,7 +231,10 @@ impl Service<Request<Body>> for BundleHandler {
     type Error = hyper::Error;
     type Future = std::future::Ready<std::result::Result<Self::Response, Self::Error>>;
 
-    fn poll_ready(&mut self, _cx: &mut TaskContext<'_>) -> Poll<std::result::Result<(), Self::Error>> {
+    fn poll_ready(
+        &mut self,
+        _cx: &mut TaskContext<'_>,
+    ) -> Poll<std::result::Result<(), Self::Error>> {
         Poll::Ready(Ok(()))
     }
 
@@ -219,7 +245,10 @@ impl Service<Request<Body>> for BundleHandler {
                 .body(Body::from("method is not allowed"))
                 .unwrap()
         } else {
-            match self.source.get_bundle_for_trust_domain(self.trust_domain.clone()) {
+            match self
+                .source
+                .get_bundle_for_trust_domain(self.trust_domain.clone())
+            {
                 Ok(bundle) => match bundle.marshal() {
                     Ok(body) => Response::builder()
                         .status(StatusCode::OK)
@@ -293,9 +322,7 @@ fn fetch_url(url: &Url, options: &FetchOptions) -> Result<Vec<u8>> {
                 .map_err(|err| wrap_error(format!("unable to create TLS connection: {}", err)))?;
             HttpStream::Tls(rustls::StreamOwned::new(conn, tcp))
         }
-        "http" => HttpStream::Plain(
-            TcpStream::connect(&addr).map_err(|err| wrap_error(err))?,
-        ),
+        "http" => HttpStream::Plain(TcpStream::connect(&addr).map_err(|err| wrap_error(err))?),
         scheme => {
             return Err(wrap_error(format!("unsupported URL scheme: {}", scheme)));
         }
@@ -316,7 +343,9 @@ fn fetch_url(url: &Url, options: &FetchOptions) -> Result<Vec<u8>> {
     stream.flush().map_err(|err| wrap_error(err))?;
 
     let mut response = Vec::new();
-    stream.read_to_end(&mut response).map_err(|err| wrap_error(err))?;
+    stream
+        .read_to_end(&mut response)
+        .map_err(|err| wrap_error(err))?;
     parse_http_body(&response)
 }
 
@@ -360,8 +389,12 @@ fn parse_http_body(response: &[u8]) -> Result<Vec<u8>> {
         .ok_or_else(|| wrap_error("invalid HTTP response"))?;
     let status_line = String::from_utf8_lossy(status_line).trim().to_string();
     let mut parts = status_line.split_whitespace();
-    let _proto = parts.next().ok_or_else(|| wrap_error("invalid HTTP response"))?;
-    let status = parts.next().ok_or_else(|| wrap_error("invalid HTTP response"))?;
+    let _proto = parts
+        .next()
+        .ok_or_else(|| wrap_error("invalid HTTP response"))?;
+    let status = parts
+        .next()
+        .ok_or_else(|| wrap_error("invalid HTTP response"))?;
     if status != "200" {
         return Err(wrap_error(format!("unexpected HTTP status {}", status)));
     }

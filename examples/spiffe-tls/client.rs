@@ -11,7 +11,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let server_id = spiffeid::require_from_string("spiffe://example.org/server");
     let authorizer = spiffetls::tlsconfig::authorize_id(server_id);
     let server_name = rustls::ServerName::try_from("example.org")?;
-    let mut stream = spiffetls::dial(&ctx, "127.0.0.1:55555", server_name, authorizer, Vec::new()).await?;
+    let mut stream =
+        spiffetls::dial(&ctx, "127.0.0.1:55555", server_name, authorizer, Vec::new()).await?;
 
     stream.write_all(b"Hello server")?;
     stream.flush()?;
