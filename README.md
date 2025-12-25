@@ -54,6 +54,21 @@ let trust_domain = spiffeid::require_trust_domain_from_string("domain.test");
 let bundle = federation::fetch_bundle(trust_domain, "http://localhost:8080/bundle", &[]).unwrap();
 ```
 
+
+Establish a TLS connection using SPIFFE authentication (mTLS):
+
+```rust
+use spiffe_rs::spiffeid;
+use spiffe_rs::spiffetls;
+use spiffe_rs::workloadapi;
+
+let ctx = workloadapi::background();
+let server_id = spiffeid::require_from_string("spiffe://example.org/server");
+let authorizer = spiffetls::tlsconfig::authorize_id(server_id);
+// Address can be an IP or hostname
+let stream = spiffetls::dial(&ctx, "127.0.0.1:55555", "example.org", authorizer, Vec::new()).await.unwrap();
+```
+
 ## Feature Matrix (vs spiffe-go)
 
 | Feature | spiffe-go | spiffe-rs |
